@@ -22,7 +22,7 @@ An AI-powered multi-stage diagnostic assistant for radiologists. The system inge
 ┌───────────────────┐
 │   MODULE B        │  ← pytorch-grad-cam
 │   Explainability  │    Grad-CAM heatmap overlay
-│   Status: 🔄 Next │    per-disease visual map
+│   Status: ✅ Done │    per-disease visual map
 └───────┬───────────┘
         │  Heatmap + findings
         ▼
@@ -182,7 +182,7 @@ Key dependencies: `torch`, `torchvision`, `pytorch-grad-cam`, `chromadb`, `sente
 - [x] Module A — Data preprocessing pipeline
 - [x] Module A — DenseNet-121 training with patient-aware splits
 - [x] Module A — Model evaluation (AUC-ROC per disease)
-- [ ] Module B — Grad-CAM heatmap generation
+- [x] Module B — Grad-CAM heatmap generation
 - [ ] Module C — Medical guideline knowledge base + vector store
 - [ ] Module C — RAG pipeline + report generation
 - [ ] Frontend — Streamlit UI

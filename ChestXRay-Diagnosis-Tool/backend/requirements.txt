@@ -1,3 +1,10 @@
 fastapi
 uvicorn
 python-dotenv
+torch
+torchvision 
+grad-cam
+opencv-python 
+matplotlib 
+Pillow
+ipykernel
