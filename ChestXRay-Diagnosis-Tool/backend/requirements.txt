@@ -8,3 +8,4 @@ opencv-python
 matplotlib 
 Pillow
 ipykernel
+numpy<2.0.0
