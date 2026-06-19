@@ -167,6 +167,15 @@ ChestXRay-Diagnosis-Tool/
 
 ## Setup & Requirements
 
+First, create and activate a virtual environment using Python 3.11:
+
+```bash
+python3.11 -m venv venv
+source venv/bin/activate  # On Windows use: venv\Scripts\activate
+```
+
+Then, install the dependencies:
+
 ```bash
 pip install -r backend/requirements.txt
 ```
