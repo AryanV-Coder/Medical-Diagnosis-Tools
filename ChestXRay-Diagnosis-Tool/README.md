@@ -20,9 +20,9 @@ An AI-powered multi-stage diagnostic assistant for radiologists. The system inge
         │  Disease probabilities
         ▼
 ┌───────────────────┐
-│   MODULE B        │  ← pytorch-grad-cam
-│   Explainability  │    Grad-CAM heatmap overlay
-│   Status: ✅ Done │    per-disease visual map
+│   MODULE B        │  ← pytorch-grad-cam + FastAPI
+│   Explainability  │    API endpoint, Grad-CAM heatmap
+│   Status: ✅ Done │    for single highest-prob disease
 └───────┬───────────┘
         │  Heatmap + findings
         ▼
@@ -84,17 +84,18 @@ An AI-powered multi-stage diagnostic assistant for radiologists. The system inge
 
 ---
 
-## Module B — Explainability (Grad-CAM) 🔄
+## Module B — Explainability (Grad-CAM) & API ✅
 
-**Goal:** Generate a visual heatmap overlay on the X-ray showing *where* the model focused for each disease prediction.
+**Goal:** Provide an API endpoint that processes an X-ray and generates a visual heatmap overlay showing *where* the model focused for its primary disease prediction.
 
 **Approach:**
-- Library: `pytorch-grad-cam`
-- Target layer: `model.features.denseblock4` (last convolutional block)
-- Output: 3 heatmap images (one per disease) overlaid on the original X-ray
-- Color scale: Blue (low attention) → Red (high attention)
+- **API:** FastAPI endpoint (`POST /predict`)
+- **Library:** `pytorch-grad-cam`
+- **Target layer:** `model.features.denseblock4` (last convolutional block)
+- **Output:** Returns JSON containing the highest-probability disease name, probability, positive flag (threshold 0.5), and a Base64-encoded Grad-CAM heatmap overlay image.
+- **Color scale:** Blue (low attention) → Red (high attention)
 
-**Notebook:** `backend/gradcam_inference.ipynb` *(coming soon)*
+**Files:** `backend/main.py`, `backend/inference.py`, `backend/model.py`, `backend/config.py`
 
 ---
 
@@ -153,7 +154,11 @@ DISCLAIMER: AI-assisted draft. Must be reviewed by a licensed radiologist.
 ChestXRay-Diagnosis-Tool/
 ├── backend/
 │   ├── data_preprocessing_&_model_training.ipynb  # Module A (Colab)
-│   ├── gradcam_inference.ipynb                    # Module B (coming)
+│   ├── gradcam_inference.ipynb                    # Module B (Exploration)
+│   ├── main.py                                    # FastAPI server
+│   ├── inference.py                               # ML inference & Grad-CAM pipeline
+│   ├── model.py                                   # PyTorch model loader
+│   ├── config.py                                  # Shared configuration
 │   ├── rag_report_generator.py                    # Module C (coming)
 │   └── requirements.txt
 ├── frontend/
@@ -180,7 +185,7 @@ Then, install the dependencies:
 pip install -r backend/requirements.txt
 ```
 
-Key dependencies: `torch`, `torchvision`, `pytorch-grad-cam`, `chromadb`, `sentence-transformers`, `google-generativeai`, `streamlit`
+Key dependencies: `fastapi`, `uvicorn`, `python-multipart`, `torch`, `torchvision`, `pytorch-grad-cam`, `chromadb`, `sentence-transformers`, `google-generativeai`, `streamlit`
 
 **Training environment:** Google Colab (T4 GPU recommended)
 
