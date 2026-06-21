@@ -2,10 +2,11 @@ fastapi
 uvicorn
 python-dotenv
 torch
-torchvision 
+torchvision
 grad-cam
-opencv-python 
-matplotlib 
+opencv-python
+matplotlib
 Pillow
 ipykernel
 numpy<2.0.0
+python-multipart
