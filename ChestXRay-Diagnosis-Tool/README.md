@@ -135,7 +135,7 @@ DISCLAIMER: AI-assisted draft. Must be reviewed by a licensed radiologist.
 
 **Goal:** A clean, professional interface for radiologists to upload X-rays and view results.
 
-**Stack:** Streamlit (Python-native, runs locally)
+<!-- **Stack:** Streamlit (Python-native, runs locally) -->
 
 **Features:**
 - Drag-and-drop X-ray upload
