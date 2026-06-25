@@ -10,3 +10,13 @@ Pillow
 ipykernel
 numpy<2.0.0
 python-multipart
+langchain
+langchain_community
+langchain-core
+pypdf
+langchain-text-splitters
+python-dotenv
+faiss-cpu
+langchain_huggingface
+huggingface_hub
+duckduckgo-search
