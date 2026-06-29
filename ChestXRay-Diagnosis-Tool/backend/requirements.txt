@@ -13,9 +13,10 @@ python-multipart
 langchain
 langchain_community
 langchain-core
+langchain-google-genai
 pypdf
 langchain-text-splitters
-python-dotenv
+langgraph
 faiss-cpu
 langchain_huggingface
 huggingface_hub
