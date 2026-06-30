@@ -188,17 +188,3 @@ pip install -r backend/requirements.txt
 Key dependencies: `fastapi`, `uvicorn`, `python-multipart`, `torch`, `torchvision`, `pytorch-grad-cam`, `chromadb`, `sentence-transformers`, `google-generativeai`, `streamlit`
 
 **Training environment:** Google Colab (T4 GPU recommended)
-
----
-
-## Roadmap
-
-- [x] Module A — Data preprocessing pipeline
-- [x] Module A — DenseNet-121 training with patient-aware splits
-- [x] Module A — Model evaluation (AUC-ROC per disease)
-- [x] Module B — Grad-CAM heatmap generation
-- [ ] Module C — Medical guideline knowledge base + vector store
-- [ ] Module C — RAG pipeline + report generation
-- [ ] Frontend — Streamlit UI
-- [ ] Frontend — PDF export
-- [ ] Retrain on full 57K dataset for improved AUC
