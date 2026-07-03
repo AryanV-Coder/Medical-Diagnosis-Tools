@@ -1,6 +1,6 @@
 # ChestXRay Diagnosis Tool
 
-An AI-powered multi-stage diagnostic assistant for radiologists. The system ingests a patient's Chest X-ray, classifies it for three target diseases, generates a visual heatmap explaining the model's focus, and drafts a structured clinical report using a RAG-augmented LLM.
+An AI-powered multi-stage diagnostic assistant for radiologists. The system ingests a patient's Chest X-ray, classifies it for three target diseases, generates a visual Grad-CAM saliency heatmap explaining the model's focus, and drafts a structured clinical report through a two-agent LangGraph RAG pipeline.
 
 > ⚠️ **Disclaimer:** This tool is intended for research and educational purposes only. It is **not** a certified medical device. All AI-generated reports must be reviewed and validated by a licensed radiologist before any clinical use.
 
@@ -13,7 +13,7 @@ An AI-powered multi-stage diagnostic assistant for radiologists. The system inge
         │
         ▼
 ┌───────────────────┐
-│   MODULE A        │  ← DenseNet-121 (fine-tuned)
+│   MODULE A        │  ← DenseNet-121 (fine-tuned on NIH ChestX-ray14)
 │   Classification  │    Multi-label: 3 diseases
 │   Status: ✅ Done │    Mean AUC-ROC: 0.7735
 └───────┬───────────┘
@@ -21,22 +21,22 @@ An AI-powered multi-stage diagnostic assistant for radiologists. The system inge
         ▼
 ┌───────────────────┐
 │   MODULE B        │  ← pytorch-grad-cam + FastAPI
-│   Explainability  │    API endpoint, Grad-CAM heatmap
-│   Status: ✅ Done │    for single highest-prob disease
+│   Explainability  │    Grad-CAM heatmap overlay
+│   Status: ✅ Done │    for highest-probability disease
 └───────┬───────────┘
         │  Heatmap + findings
         ▼
 ┌───────────────────┐
-│   MODULE C        │  ← ChromaDB + Gemini API
-│   RAG Report      │    Retrieval-Augmented Generation
-│   Status: ⬜ Todo │    Structured clinical report
+│   MODULE C        │  ← LangGraph (Scribe → Auditor) + FAISS + Gemini 2.5 Flash
+│   RAG Report      │    Two-agent loop with structured section output
+│   Status: ✅ Done │    FAISS vector store, HuggingFace embeddings
 └───────┬───────────┘
-        │  Draft report
+        │  Structured report (raw text + parsed sections)
         ▼
 ┌───────────────────┐
-│   FRONTEND        │  ← Streamlit
-│   Web UI          │    Upload → Results → Download
-│   Status: ⬜ Todo │
+│   FRONTEND        │  ← React + Vite
+│   Web UI          │    Upload → Heatmap → Findings → Editable Report
+│   Status: ✅ Done │
 └───────────────────┘
 ```
 
@@ -80,71 +80,105 @@ An AI-powered multi-stage diagnostic assistant for radiologists. The system inge
 | **Mean** | **0.7735** |
 
 **Notebook:** `backend/data_preprocessing_&_model_training.ipynb`  
-**Output:** `best_model.pth`
+**Output:** `backend/models/best_model.pth`
 
 ---
 
 ## Module B — Explainability (Grad-CAM) & API ✅
 
-**Goal:** Provide an API endpoint that processes an X-ray and generates a visual heatmap overlay showing *where* the model focused for its primary disease prediction.
+**Goal:** Provide a FastAPI endpoint that processes an X-ray and generates a visual saliency heatmap showing *where* the model focused for its primary disease prediction.
 
 **Approach:**
-- **API:** FastAPI endpoint (`POST /predict`)
+- **API:** FastAPI (`POST /predict`) — version `2.0.0`
 - **Library:** `pytorch-grad-cam`
 - **Target layer:** `model.features.denseblock4` (last convolutional block)
-- **Output:** Returns JSON containing the highest-probability disease name, probability, positive flag (threshold 0.5), and a Base64-encoded Grad-CAM heatmap overlay image.
+- **Inference:** Selects the highest-probability disease across all 3 classes, applies `GradCAM` for that class index
+- **Output:** JSON with disease name, probability, positive flag (threshold 0.5), Base64-encoded Grad-CAM heatmap overlay, and raw grayscale attention map
 - **Color scale:** Blue (low attention) → Red (high attention)
+
+**API Endpoints:**
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/health` | Returns device info and disease list |
+| `POST` | `/predict` | Upload PNG/JPEG → returns classification + heatmap + report |
 
 **Files:** `backend/main.py`, `backend/inference.py`, `backend/model.py`, `backend/config.py`
 
 ---
 
-## Module C — RAG Clinical Report ⬜
+## Module C — RAG Clinical Report ✅
 
-**Goal:** Use disease predictions + heatmap findings to draft a structured radiology report grounded in medical guidelines.
+**Goal:** Use disease predictions to draft a structured radiology report grounded in disease-specific clinical guidelines, reviewed by a safety auditor before delivery.
 
-**Architecture:**
-- **Knowledge Base:** Medical guidelines for the 3 target diseases (chunked text)
-- **Embeddings:** `sentence-transformers` (local, free)
-- **Vector Store:** ChromaDB (local, no cloud needed)
-- **LLM:** Google Gemini API
-- **Pipeline:** Query vector store with findings → retrieve guideline context → inject into prompt → generate report
+**Architecture — Two-Agent LangGraph Loop:**
 
-**Report Format:**
 ```
-RADIOLOGY REPORT
-Patient: [ID]    Date: [auto]
-
-FINDINGS:
-  Cardiomegaly:     Present (76.2% confidence)
-  Pleural Effusion: Absent  (18.4% confidence)
-  Pneumothorax:     Present (74.8% confidence)
-
-CLINICAL IMPRESSION:
-  [AI-generated paragraph with guideline citations]
-
-RECOMMENDATIONS:
-  [AI-generated follow-up suggestions]
-
-DISCLAIMER: AI-assisted draft. Must be reviewed by a licensed radiologist.
+[Scribe Node]  →  writes/rewrites the clinical report
+      │
+      ▼
+[Auditor Node] →  checks safety checklist
+      │
+      ├── PASS  →  parse sections → END
+      └── FAIL  →  send feedback back to Scribe (max 3 iterations)
 ```
+
+**Components:**
+- **LLM:** Google Gemini 2.5 Flash (`gemini-2.5-flash`) via `langchain-google-genai`
+- **Embeddings:** `sentence-transformers/all-MiniLM-L6-v2` via HuggingFace Endpoints
+- **Vector Store:** FAISS (local, no cloud needed) with disease-specific indexes
+- **Knowledge Base:** Medical guideline PDFs chunked into FAISS indexes per disease
+
+**FAISS Retrieval Map:**
+
+| Disease | Indexes Queried |
+|---|---|
+| Cardiomegaly | `cardiomegaly`, `xraydictionary` |
+| Pleural Effusion | `pleuraleffusion_pneumothorax`, `tuberculosis`, `xraydictionary` |
+| Pneumothorax | `pleuraleffusion_pneumothorax`, `xraydictionary` |
+
+**Report Sections (parsed for frontend editor):**
+- `title` — Report Title
+- `patient_info` — Disease, confidence, positive flag, timestamp
+- `findings` — `## FINDINGS`
+- `impression` — `## CLINICAL IMPRESSION`
+- `recommendations` — `## RECOMMENDATIONS`
+- `disclaimer` — `## DISCLAIMER` *(read-only)*
+
+**Auditor Checklist:**
+1. Has a `## DISCLAIMER` section?
+2. Correctly names the detected disease?
+3. Has `## RECOMMENDATIONS` with ≥2 actionable steps?
+4. If Effusion — mentions TB/NTEP screening?
+
+**Files:** `backend/report_graph.py`, `backend/faiss_db/`, `backend/rag.ipynb`
 
 ---
 
-## Frontend — Web UI ⬜
+## Frontend — Web UI ✅
 
 **Goal:** A clean, professional interface for radiologists to upload X-rays and view results.
 
-<!-- **Stack:** Streamlit (Python-native, runs locally) -->
+**Stack:** React 18 + Vite
 
 **Features:**
-- Drag-and-drop X-ray upload
-- Side-by-side: Original X-ray | Grad-CAM Heatmap
-- Disease probability bars (per disease)
-- AI-generated clinical report panel
-- PDF download of the report
+- Drag-and-drop X-ray upload with live thumbnail preview (PNG/JPEG)
+- Animated multi-step status indicator during inference
+- Side-by-side comparison: Original Radiograph | Grad-CAM Saliency Map
+- **Diagnostic Findings card** — confidence bar per disease, Present/Absent pill badge
+- **Clinical Report card** — formatted report with Copy-to-clipboard and `.txt` download
+- Error banner with descriptive API error messages
+- Fully accessible (ARIA roles, keyboard navigation, live regions)
 
-**File:** `frontend/app.py` *(coming soon)*
+**Components:**
+
+| File | Purpose |
+|---|---|
+| `App.jsx` | Root — state management, API fetch, layout |
+| `UploadZone.jsx` | Drag-and-drop / click-to-browse file input |
+| `FindingsCard.jsx` | Per-disease confidence bars and Present/Absent indicators |
+| `ReportCard.jsx` | Formatted report display with copy & download actions |
+| `index.css` | Design system — dark theme, CSS custom properties, animations |
 
 ---
 
@@ -153,38 +187,90 @@ DISCLAIMER: AI-assisted draft. Must be reviewed by a licensed radiologist.
 ```
 ChestXRay-Diagnosis-Tool/
 ├── backend/
-│   ├── data_preprocessing_&_model_training.ipynb  # Module A (Colab)
-│   ├── gradcam_inference.ipynb                    # Module B (Exploration)
-│   ├── main.py                                    # FastAPI server
+│   ├── data_preprocessing_&_model_training.ipynb  # Module A (Colab, T4 GPU)
+│   ├── gradcam_inference.ipynb                    # Module B exploration
+│   ├── rag.ipynb                                  # Module C exploration
+│   ├── main.py                                    # FastAPI server (v2.0.0)
 │   ├── inference.py                               # ML inference & Grad-CAM pipeline
-│   ├── model.py                                   # PyTorch model loader
+│   ├── model.py                                   # PyTorch DenseNet-121 loader
 │   ├── config.py                                  # Shared configuration
-│   ├── rag_report_generator.py                    # Module C (coming)
+│   ├── report_graph.py                            # LangGraph Scribe→Auditor RAG pipeline
+│   ├── faiss_db/                                  # FAISS vector store indexes
+│   ├── models/
+│   │   └── best_model.pth                         # Trained weights
+│   ├── CONTEXT/                                   # Source PDFs for RAG
 │   └── requirements.txt
 ├── frontend/
-│   └── app.py                                     # Streamlit UI (coming)
-├── models/
-│   └── best_model.pth                             # Trained weights
+│   ├── src/
+│   │   ├── App.jsx                                # Root component
+│   │   ├── main.jsx                               # React entry point
+│   │   ├── index.css                              # Design system & styles
+│   │   ├── icons.jsx                              # SVG icon components
+│   │   └── components/
+│   │       ├── UploadZone.jsx
+│   │       ├── FindingsCard.jsx
+│   │       └── ReportCard.jsx
+│   ├── index.html
+│   ├── vite.config.js
+│   └── package.json
 └── README.md
 ```
 
 ---
 
-## Setup & Requirements
+## Setup & Running
 
-First, create and activate a virtual environment using Python 3.11:
+### Backend
+
+Create and activate a virtual environment (Python 3.11 recommended):
 
 ```bash
 python3.11 -m venv venv
-source venv/bin/activate  # On Windows use: venv\Scripts\activate
+source venv/bin/activate  # On Windows: venv\Scripts\activate
 ```
 
-Then, install the dependencies:
+Install dependencies:
 
 ```bash
 pip install -r backend/requirements.txt
 ```
 
-Key dependencies: `fastapi`, `uvicorn`, `python-multipart`, `torch`, `torchvision`, `pytorch-grad-cam`, `chromadb`, `sentence-transformers`, `google-generativeai`, `streamlit`
+Create a `.env` file in `backend/`:
+
+```env
+GEMINI_API_KEY=your_google_gemini_api_key
+HF_TOKEN=your_huggingface_token
+```
+
+Start the API server:
+
+```bash
+cd backend
+uvicorn main:app --reload --port 8000
+```
+
+### Frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+The app will be available at `http://localhost:5173`.
+
+### Key Backend Dependencies
+
+| Package | Purpose |
+|---|---|
+| `fastapi` / `uvicorn` | API server |
+| `torch` / `torchvision` | DenseNet-121 inference |
+| `grad-cam` | Grad-CAM saliency maps |
+| `opencv-python` / `Pillow` | Image processing |
+| `langgraph` | Scribe → Auditor agent loop |
+| `langchain-google-genai` | Gemini 2.5 Flash LLM |
+| `langchain-huggingface` | HuggingFace embeddings |
+| `faiss-cpu` | Local vector store |
+| `pypdf` / `langchain-text-splitters` | PDF ingestion for RAG |
 
 **Training environment:** Google Colab (T4 GPU recommended)
