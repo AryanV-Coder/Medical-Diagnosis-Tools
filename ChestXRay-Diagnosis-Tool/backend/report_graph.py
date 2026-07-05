@@ -5,7 +5,7 @@ from typing import TypedDict
 
 from dotenv import load_dotenv
 from langchain_community.vectorstores import FAISS
-from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_groq import ChatGroq
 from langchain_huggingface import HuggingFaceEndpointEmbeddings
 from langgraph.graph import StateGraph, END
 
@@ -24,9 +24,9 @@ embeddings = HuggingFaceEndpointEmbeddings(
     huggingfacehub_api_token=os.getenv("HF_TOKEN"),
 )
 
-llm = ChatGoogleGenerativeAI(
-    model="gemini-2.5-flash",
-    google_api_key=os.getenv("GEMINI_API_KEY"),
+llm = ChatGroq(
+    model="llama-3.3-70b-versatile",
+    api_key=os.getenv("GROQ_API_KEY"),
     temperature=0.3,
 )
 

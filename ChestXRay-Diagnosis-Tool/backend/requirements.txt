@@ -13,7 +13,7 @@ python-multipart
 langchain
 langchain_community
 langchain-core
-langchain-google-genai
+langchain-groq
 pypdf
 langchain-text-splitters
 langgraph
