@@ -1,0 +1,335 @@
+/* ReportCard.module.css */
+
+.card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+  animation: fadeSlideIn 0.35s ease;
+}
+
+@keyframes fadeSlideIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Section header ── */
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 20px;
+  background: var(--color-bg);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.sectionLabel {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+/* ── Image row ── */
+.imageRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.imageCell {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.imageCell:first-child {
+  border-right: 1px solid var(--color-border);
+}
+
+.imageLabel {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.xrayImage {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: contain;
+  border-radius: var(--radius-md);
+  background: #f1f5f9;
+  border: 1px solid var(--color-border);
+  display: block;
+}
+
+/* ── Findings badge row ── */
+.findingsRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-bg);
+}
+
+.findingItem {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.findingKey {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.findingValue {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.divider {
+  width: 1px;
+  height: 32px;
+  background: var(--color-border);
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 99px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.pillPositive {
+  background: var(--color-positive-bg);
+  color: var(--color-positive);
+}
+
+.pillNegative {
+  background: var(--color-negative-bg);
+  color: var(--color-negative);
+}
+
+.confidenceMeter {
+  flex: 1;
+  min-width: 160px;
+}
+
+.meterTrack {
+  height: 6px;
+  border-radius: 99px;
+  background: var(--color-border);
+  overflow: hidden;
+  margin-top: 6px;
+}
+
+.meterFill {
+  height: 100%;
+  border-radius: 99px;
+  background: var(--color-accent);
+  transition: width 0.6s ease;
+}
+
+/* ── Report section ── */
+.reportSection {
+  padding: 20px;
+}
+
+.reportHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.reportTitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.reportActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Edit toggle button */
+.toggleBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+
+.toggleBtn:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+  background: var(--color-accent-light);
+}
+
+.toggleBtnActive {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+  background: var(--color-accent-light);
+}
+
+/* Download PDF button */
+.downloadBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  background: var(--color-accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+  box-shadow: 0 1px 4px rgba(29,78,216,0.2);
+}
+
+.downloadBtn:hover:not(:disabled) {
+  background: var(--color-accent-hover);
+  transform: translateY(-1px);
+}
+
+.downloadBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* ── Rendered Markdown view ── */
+.renderedReport {
+  padding: 20px 22px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: #fafbfc;
+  font-size: 14px;
+  line-height: 1.75;
+  color: var(--color-text-primary);
+  min-height: 280px;
+}
+
+/* Markdown typography */
+.renderedReport h2 {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+  margin: 20px 0 8px;
+  padding-bottom: 5px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.renderedReport h2:first-child {
+  margin-top: 0;
+}
+
+.renderedReport strong {
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.renderedReport ul {
+  padding-left: 20px;
+  margin: 6px 0;
+}
+
+.renderedReport li {
+  margin: 4px 0;
+  color: var(--color-text-secondary);
+}
+
+.renderedReport p {
+  margin: 6px 0;
+  color: var(--color-text-secondary);
+}
+
+/* ── WYSIWYG contenteditable editor ── */
+.reportEditor {
+  min-height: 300px;
+  padding: 18px 20px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: #fafbfc;
+  font-size: 14px;
+  line-height: 1.8;
+  color: var(--color-text-primary);
+  outline: none;
+  cursor: text;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.reportEditor:focus {
+  border-color: var(--color-accent);
+  background: var(--color-surface);
+  box-shadow: 0 0 0 3px rgba(29,78,216,0.08);
+}
+
+/* ── Spinner inside Download PDF button ── */
+.btnSpinner {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(255,255,255,0.35);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Disclaimer banner ── */
+.disclaimer {
+  margin: 14px 0 0;
+  padding: 10px 14px;
+  background: var(--color-warning-bg);
+  border-left: 3px solid #d97706;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  color: var(--color-warning);
+  line-height: 1.5;
+}
+
+/* ── PDF-only snapshot target ── */
+.pdfTarget {
+  background: #fff;
+  font-family: var(--font-sans);
+  color: #0f172a;
+  padding: 0;
+}

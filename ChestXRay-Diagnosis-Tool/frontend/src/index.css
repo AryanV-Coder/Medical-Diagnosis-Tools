@@ -1,0 +1,110 @@
+/* ============================================================
+   Global reset + design tokens — light mode only
+   ============================================================ */
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  /* Palette */
+  --color-bg:          #f0f4f8;
+  --color-surface:     #ffffff;
+  --color-border:      #dde3ec;
+  --color-border-hover:#b0bdd0;
+
+  --color-text-primary:   #0f172a;
+  --color-text-secondary: #475569;
+  --color-text-muted:     #94a3b8;
+
+  --color-accent:         #1e3a8a;
+  --color-accent-hover:   #172554;
+  --color-accent-light:   #dbeafe;
+
+  --color-positive:       #15803d;
+  --color-positive-bg:    #dcfce7;
+  --color-negative:       #b91c1c;
+  --color-negative-bg:    #fee2e2;
+
+  --color-warning:        #92400e;
+  --color-warning-bg:     #fef3c7;
+
+  /* Typography */
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono: 'SFMono-Regular', Consolas, monospace;
+
+  /* Spacing */
+  --radius-sm:  6px;
+  --radius-md:  10px;
+  --radius-lg:  14px;
+
+  /* Shadow */
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.08), 0 2px 4px rgba(0,0,0,0.04);
+  --shadow-lg: 0 10px 30px rgba(0,0,0,0.10), 0 4px 8px rgba(0,0,0,0.05);
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--color-bg);
+  color: var(--color-text-primary);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ---- Utility ---- */
+.sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0,0,0,0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ── WYSIWYG report editor — global typography ──
+   Applied globally because contenteditable innerHTML is injected
+   at runtime and cannot be scoped by CSS Modules.
+   Selector is specific enough to avoid leaking.
+── */
+#report-editor h2 {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: #1d4ed8;
+  margin: 22px 0 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #dde3ec;
+}
+
+#report-editor h2:first-child {
+  margin-top: 0;
+}
+
+#report-editor strong {
+  font-weight: 600;
+  color: #0f172a;
+}
+
+#report-editor ul {
+  padding-left: 22px;
+  margin: 6px 0 10px;
+}
+
+#report-editor li {
+  margin: 5px 0;
+  color: #475569;
+}
+
+#report-editor p {
+  margin: 6px 0 10px;
+  color: #475569;
+}
