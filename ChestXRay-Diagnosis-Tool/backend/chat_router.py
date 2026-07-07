@@ -35,10 +35,9 @@ class ChatRequest(BaseModel):
 
 
 class ChatResponse(BaseModel):
-    session_id:  str
-    answer:      str
-    dbs_queried: list[str]
-    sources:     list[str]
+    session_id:         str
+    answer:             str
+    intermediate_steps: list[dict]
 
 
 class HistoryResponse(BaseModel):
@@ -85,10 +84,9 @@ async def chat(req: ChatRequest):
     session["history"].append({"role": "assistant",  "content": result["answer"]})
 
     return ChatResponse(
-        session_id  = session_id,
-        answer      = result["answer"],
-        dbs_queried = result["dbs_queried"],
-        sources     = result["sources"],
+        session_id         = session_id,
+        answer             = result["answer"],
+        intermediate_steps = result["intermediate_steps"],
     )
 
 

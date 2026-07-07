@@ -5,13 +5,6 @@ import styles from "./ChatPanel.module.css";
 
 marked.setOptions({ breaks: true, gfm: true });
 
-const SUGGESTIONS = [
-  "What does this finding mean?",
-  "What are the next steps?",
-  "Explain the Grad-CAM heatmap",
-  "What treatment is typically recommended?",
-];
-
 /**
  * @param {{ reportText: string }} props
  */
@@ -53,10 +46,10 @@ export default function ChatPanel({ reportText }) {
         message:   trimmed,
       };
 
-      // Send report_context only on the first message of a session
-      if (!reportSentRef.current && reportText) {
-        payload.reportContext  = reportText;
-        reportSentRef.current  = true;
+      // Always send the report context. If the backend restarts, it will recreate the 
+      // in-memory session and needs this context to restore the state.
+      if (reportText) {
+        payload.reportContext = reportText;
       }
 
       const res = await sendChatMessage(payload);
@@ -67,10 +60,9 @@ export default function ChatPanel({ reportText }) {
       setMessages(prev => [
         ...prev,
         {
-          role:       "assistant",
-          text:       res.answer,
-          dbsQueried: res.dbsQueried,
-          sources:    res.sources,
+          role:              "assistant",
+          text:              res.answer,
+          intermediateSteps: res.intermediateSteps,
         },
       ]);
     } catch (err) {
@@ -134,13 +126,6 @@ export default function ChatPanel({ reportText }) {
             <p className={styles.welcomeText}>
               I have full context of the generated report. Ask me anything about the findings, implications, or next steps.
             </p>
-            <div className={styles.suggestionChips}>
-              {SUGGESTIONS.map(s => (
-                <button key={s} className={styles.chip} onClick={() => sendMessage(s)}>
-                  {s}
-                </button>
-              ))}
-            </div>
           </div>
         )}
 
@@ -158,26 +143,33 @@ export default function ChatPanel({ reportText }) {
               )}
             />
 
-            {/* Sources & DBs queried — only shown for assistant messages */}
-            {msg.role === "assistant" && (msg.dbsQueried?.length > 0 || msg.sources?.length > 0) && (
-              <div className={styles.meta}>
-                {msg.dbsQueried?.map(db => (
-                  <span key={db} className={styles.metaChip}>
-                    <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} aria-hidden="true">
-                      <ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
-                    </svg>
-                    {db}
-                  </span>
-                ))}
-                {msg.sources?.slice(0, 3).map((src, si) => (
-                  <span key={si} className={styles.metaChip} title={src}>
-                    <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} aria-hidden="true">
-                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
-                    </svg>
-                    {src.length > 40 ? src.slice(0, 40) + "…" : src}
-                  </span>
-                ))}
-              </div>
+            {/* Tool Calls (Thought Process) */}
+            {msg.role === "assistant" && msg.intermediateSteps?.length > 0 && (
+              <details style={{ marginTop: 8, fontSize: "12px", background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 6, overflow: "hidden" }}>
+                <summary style={{ padding: "6px 10px", cursor: "pointer", color: "#64748b", fontWeight: 500, display: "flex", alignItems: "center", gap: 6, userSelect: "none", outline: "none" }}>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
+                    <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+                  </svg>
+                  View agent thought process ({msg.intermediateSteps.length} steps)
+                </summary>
+                <div style={{ padding: "8px 10px", borderTop: "1px solid #e2e8f0", color: "#475569", maxHeight: 200, overflowY: "auto", display: "flex", flexDirection: "column", gap: 8 }}>
+                  {msg.intermediateSteps.map((step, si) => (
+                    <div key={si} style={{ background: "#fff", padding: 6, borderRadius: 4, border: "1px solid #f1f5f9" }}>
+                      {step.type === "action" ? (
+                        <>
+                          <div style={{ color: "#2563eb", fontWeight: 600, marginBottom: 2 }}>🛠 Tool: {step.tool}</div>
+                          <div style={{ fontFamily: "monospace", fontSize: "11px", color: "#64748b" }}>Input: {JSON.stringify(step.input)}</div>
+                        </>
+                      ) : (
+                        <>
+                          <div style={{ color: "#16a34a", fontWeight: 600, marginBottom: 2 }}>👁 Result:</div>
+                          <div style={{ fontSize: "11px", lineHeight: 1.4 }}>{step.output}</div>
+                        </>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </details>
             )}
           </div>
         ))}

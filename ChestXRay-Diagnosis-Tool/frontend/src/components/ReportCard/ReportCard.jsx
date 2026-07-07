@@ -141,7 +141,7 @@ export default function ReportCard({
           <>
             <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#94a3b8", marginBottom: 10 }}>Imaging</p>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 24 }}>
-              {[{ label: "Original X-Ray", src: imgSrc }, { label: "Grad-CAM Heatmap", src: heatmapSrc }].map(({ label, src }) => (
+              {[{ label: "Original X-Ray", src: imgSrc }, { label: "Focused Heatmap", src: heatmapSrc }].map(({ label, src }) => (
                 <div key={label} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                   <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.07em", textTransform: "uppercase", color: "#94a3b8" }}>{label}</span>
                   <img src={src} alt={label} style={{ width: "100%", aspectRatio: "1/1", objectFit: "contain", border: "1px solid #dde3ec", borderRadius: 8, background: "#f8fafc" }} crossOrigin="anonymous" />
@@ -214,8 +214,8 @@ export default function ReportCard({
                 <img id="original-xray" src={originalSrc} alt="Original chest X-ray" className={styles.xrayImage} />
               </div>
               <div className={styles.imageCell}>
-                <span className={styles.imageLabel}>Grad-CAM Heatmap</span>
-                <img id="heatmap-image" src={heatmapSrc} alt="Grad-CAM activation heatmap" className={styles.xrayImage} />
+                <span className={styles.imageLabel}>Focused Heatmap</span>
+                <img id="heatmap-image" src={heatmapSrc} alt="Focused heatmap" className={styles.xrayImage} />
               </div>
             </div>
           </>

@@ -52,7 +52,8 @@ html, body, #root {
 
 body {
   font-family: var(--font-sans);
-  background-color: var(--color-bg);
+  background: radial-gradient(ellipse at 60% 0%, #dbeafe 0%, #f0f4f8 45%, #f0f4f8 100%);
+  background-attachment: fixed;
   color: var(--color-text-primary);
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;

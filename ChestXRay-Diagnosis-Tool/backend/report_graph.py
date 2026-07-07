@@ -168,11 +168,11 @@ def scribe(state: ReportState) -> ReportState:
 
 You are provided with two images:
 - Image 1: The UPLOADED IMAGE (check whether this is a chest X-ray)
-- Image 2: The Grad-CAM heatmap from an AI model
+- Image 2: The Focused Heatmap from an AI model
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 STEP 1 — IMAGE VALIDATION
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Look at Image 1. Is it a chest X-ray (a radiograph showing the thorax, ribcage, lungs, and heart)?
 
 If NO — output ONLY this and nothing else:
@@ -182,14 +182,14 @@ The uploaded image does not appear to be a chest X-ray. A valid PA or AP chest r
 
 Do NOT produce any other sections. Stop here.
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 STEP 2 — WRITE THE REPORT (only if Image 1 IS a chest X-ray)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 ⚠️ CRITICAL SAFETY RULES — YOU MUST FOLLOW THESE STRICTLY:
 1. You are NOT performing independent radiology. Do NOT diagnose anything by looking at the images yourself.
 2. The ONLY confirmed finding is what the AI model detected: **{state['disease']}** at **{state['probability'] * 100:.1f}% confidence**.
-3. Use Image 2 (Grad-CAM) ONLY to describe the specific anatomical region highlighted (e.g. "cardiac silhouette", "left lower lung zone"). Do NOT use it to make a new diagnosis.
+3. Use Image 2 (Focused Heatmap) ONLY to describe the specific anatomical region highlighted (e.g. "cardiac silhouette", "left lower lung zone"). Do NOT use it to make a new diagnosis.
 4. Write about ONLY **{state['disease']}**. Do NOT mention any other disease by name — not even to say it was not found.
 5. For areas NOT related to **{state['disease']}**, write "No acute abnormality detected by the AI model".
 6. Do NOT use phrases like "I observe", "I notice", or "appears to show".
@@ -210,7 +210,7 @@ Format: **bold** for key terms, bullet points for lists, no extra headings insid
 - **Heart and Mediastinum:** [Write here ONLY if {state['disease']} is Cardiomegaly. Use Image 2 to state which specific cardiac region is highlighted. For any other disease write: No acute abnormality detected by the AI model.]
 - **Bones and Soft Tissues:** No acute abnormality detected by the AI model.
 - **Hardware/Lines/Tubes:** None identified.
-- **Localization:** The Grad-CAM heatmap (Image 2) highlights the [fill in the specific anatomical region you see highlighted in Image 2, e.g. "cardiac silhouette" or "right lower lung zone"] as the region most associated with the AI model's detection of **{state['disease']}**.
+- **Localization:** The Focused Heatmap (Image 2) highlights the [fill in the specific anatomical region you see highlighted in Image 2, e.g. "cardiac silhouette" or "right lower lung zone"] as the region most associated with the AI model's detection of **{state['disease']}**.
 
 ## IMPRESSION
 
@@ -243,7 +243,7 @@ Use ONLY the guideline extracts above. Do not invent any step not present in tho
 
 You are provided with the same two images as before:
 - Image 1: The ORIGINAL chest X-ray
-- Image 2: The Grad-CAM heatmap (shows WHERE the AI model is focusing)
+- Image 2: The Focused Heatmap (shows WHERE the AI model is focusing)
 
 ⚠️ SAFETY RULES (same as the original draft — do not violate these during revision):
 1. Do NOT add any new diagnosis or finding beyond what the AI model already detected: **{state['disease']}** at **{state['probability'] * 100:.1f}%**.

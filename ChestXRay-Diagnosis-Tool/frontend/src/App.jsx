@@ -7,7 +7,7 @@ import { predictXRay } from "./api/predict";
 
 const LOADING_STEPS = [
   "Running ML inference…",
-  "Generating Grad-CAM heatmap…",
+  "Generating Focused Heatmap…",
   "Composing radiology report…",
 ];
 
@@ -91,11 +91,44 @@ export default function App() {
         </div>
       </header>
 
-      {/* ── Page body: shifts left when chat opens ── */}
+      {/* ── Page body ── */}
       <div className={`pageBody${showChat ? " pageBody--chat" : ""}`}>
 
-        {/* Left column — all workflow content */}
-        <main className="contentCol" id="main-content">
+        {/* Left column */}
+        <main className={`contentCol${showChat ? "" : " contentCol--narrow"}`} id="main-content">
+
+          {/* Hero — only shown before a report is ready */}
+          {!showChat && status === "idle" && (
+            <div className="hero">
+              <div className="heroIcon" aria-hidden="true">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+                </svg>
+              </div>
+              <h2 className="heroTitle">AI-Powered Chest X-Ray Analysis</h2>
+              <p className="heroSub">
+                Upload a Chest X-ray and receive an AI-generated radiology report with Focused Heatmap visualisation.
+              </p>
+              <div className="heroPills">
+                <span className="heroPill">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 1 1 0 20A10 10 0 0 1 12 2zm0 2a8 8 0 1 0 0 16A8 8 0 0 0 12 4zm-1 4h2v5h-2zm0 6h2v2h-2z"/></svg>
+                  AI Diagnosis
+                </span>
+                <span className="heroPill">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                  Focused Heatmap
+                </span>
+                <span className="heroPill">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                  Structured Report
+                </span>
+                <span className="heroPill">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                  AI Chat Assistant
+                </span>
+              </div>
+            </div>
+          )}
 
           {/* Upload */}
           <section aria-label="Upload image">
