@@ -17,7 +17,7 @@
 }
 
 .headerInner {
-  max-width: 1100px;
+  max-width: 1400px;
   margin: 0 auto;
   padding: 0 24px;
   height: 60px;
@@ -37,11 +37,7 @@
   flex-shrink: 0;
 }
 
-.logoIcon svg {
-  color: #fff;
-}
-
-.headerText {}
+.logoIcon svg { color: #fff; }
 
 .headerTitle {
   font-size: 16px;
@@ -56,26 +52,63 @@
   font-weight: 400;
 }
 
-/* ── Main content ── */
-.main {
+/* ── Page body ── */
+/*
+ * Default: single centered column (no chat)
+ * --chat: two columns — left content stays 900px, chat panel slides in on the right
+ */
+.pageBody {
   flex: 1;
-  max-width: 900px;
-  width: 100%;
-  margin: 0 auto;
+  display: flex;
+  justify-content: center;   /* center the single content column */
+  align-items: flex-start;
   padding: 36px 24px 64px;
+  gap: 20px;
+  transition: justify-content 0.3s ease;
+}
+
+.pageBody--chat {
+  justify-content: flex-start; /* shift left, chat fills the right */
+  max-width: 1440px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+/* ── Left column: main workflow content ── */
+.contentCol {
+  flex: 0 0 auto;
+  width: 100%;
+  max-width: 900px;          /* original size preserved */
   display: flex;
   flex-direction: column;
   gap: 20px;
 }
 
-/* ── Step label ── */
-.stepLabel {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--color-text-muted);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  margin-bottom: 6px;
+/* ── Right column: chat panel ── */
+.chatCol {
+  flex: 0 0 420px;
+  width: 420px;
+  position: sticky;
+  top: 80px;                 /* 60px header + 20px gap */
+  height: calc(100vh - 100px);
+  overflow: hidden;
+}
+
+/* ── Responsive: stack on small screens ── */
+@media (max-width: 960px) {
+  .pageBody--chat {
+    flex-direction: column;
+    justify-content: flex-start;
+  }
+  .contentCol {
+    max-width: 100%;
+  }
+  .chatCol {
+    position: static;
+    flex: none;
+    width: 100%;
+    height: 520px;
+  }
 }
 
 /* ── Analyze button ── */
@@ -95,7 +128,7 @@
   border-radius: var(--radius-md);
   cursor: pointer;
   transition: background 0.15s, opacity 0.15s, transform 0.1s;
-  box-shadow: 0 2px 8px rgba(29,78,216,0.25);
+  box-shadow: 0 2px 8px rgba(30,58,138,0.25);
 }
 
 .analyzeBtn:hover:not(:disabled) {
@@ -103,9 +136,7 @@
   transform: translateY(-1px);
 }
 
-.analyzeBtn:active:not(:disabled) {
-  transform: translateY(0);
-}
+.analyzeBtn:active:not(:disabled) { transform: translateY(0); }
 
 .analyzeBtn:disabled {
   opacity: 0.45;
@@ -135,9 +166,7 @@
   animation: spin 0.75s linear infinite;
 }
 
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
+@keyframes spin { to { transform: rotate(360deg); } }
 
 .loadingText {
   font-size: 14px;
@@ -165,10 +194,7 @@
   line-height: 1.5;
 }
 
-.errorBanner svg {
-  flex-shrink: 0;
-  margin-top: 1px;
-}
+.errorBanner svg { flex-shrink: 0; margin-top: 1px; }
 
 /* ── Footer ── */
 .footer {

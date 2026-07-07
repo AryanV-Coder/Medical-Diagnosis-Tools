@@ -2,6 +2,7 @@ import { useState, useCallback, useRef } from "react";
 import "./App.css";
 import UploadPanel from "./components/UploadPanel/UploadPanel";
 import ReportCard from "./components/ReportCard/ReportCard";
+import ChatPanel from "./components/ChatPanel/ChatPanel";
 import { predictXRay } from "./api/predict";
 
 const LOADING_STEPS = [
@@ -17,8 +18,13 @@ export default function App() {
   const [error, setError]       = useState("");
   const [stepIdx, setStepIdx]   = useState(0);
   const stepTimer               = useRef(null);
-  const originalSrc             = useRef(null); // blob URL — for display only
-  const originalDataUrl         = useRef(null); // base64  — for PDF print
+  const originalSrc             = useRef(null);
+  const originalDataUrl         = useRef(null);
+
+  // Derived values lifted to component scope
+  const reportText = result?.report?.raw_text ?? result?.report ?? "";
+  const isInvalid  = reportText.toUpperCase().includes("## INVALID IMAGE");
+  const showChat   = status === "done" && !!result && !isInvalid;
 
   const cycleSteps = () => {
     setStepIdx(0);
@@ -29,17 +35,12 @@ export default function App() {
     }, 1800);
   };
 
-  const stopSteps = () => {
-    clearInterval(stepTimer.current);
-  };
+  const stopSteps = () => clearInterval(stepTimer.current);
 
   const handleAnalyze = useCallback(async () => {
     if (!file) return;
 
-    // Blob URL for fast in-page display
     originalSrc.current = URL.createObjectURL(file);
-
-    // Base64 dataURL so the print iframe can access it cross-context
     originalDataUrl.current = await new Promise((resolve) => {
       const reader = new FileReader();
       reader.onload = (e) => resolve(e.target.result);
@@ -65,7 +66,6 @@ export default function App() {
 
   const handleFileChange = (newFile) => {
     setFile(newFile);
-    // Reset results when a new file is chosen
     if (!newFile) {
       setResult(null);
       setStatus("idle");
@@ -91,81 +91,71 @@ export default function App() {
         </div>
       </header>
 
-      {/* ── Main ── */}
-      <main className="main" id="main-content">
+      {/* ── Page body: shifts left when chat opens ── */}
+      <div className={`pageBody${showChat ? " pageBody--chat" : ""}`}>
 
-        {/* Step 1 — Upload */}
-        <section aria-labelledby="upload-step-label">
-          <p id="upload-step-label" className="stepLabel">Step 1 — Upload Image</p>
-          <UploadPanel file={file} onChange={handleFileChange} />
-        </section>
+        {/* Left column — all workflow content */}
+        <main className="contentCol" id="main-content">
 
-        {/* Step 2 — Analyze */}
-        <section aria-labelledby="analyze-step-label">
-          <p id="analyze-step-label" className="stepLabel">Step 2 — Run Analysis</p>
-          <button
-            id="analyze-btn"
-            className="analyzeBtn"
-            disabled={!file || status === "loading"}
-            onClick={handleAnalyze}
-            aria-busy={status === "loading"}
-          >
-            {status === "loading" ? (
-              <>
-                <span className="spinner" aria-hidden="true" />
-                Analyzing…
-              </>
-            ) : (
-              <>
-                Analyze X-Ray
-              </>
-            )}
-          </button>
-        </section>
+          {/* Upload */}
+          <section aria-label="Upload image">
+            <UploadPanel file={file} onChange={handleFileChange} />
+          </section>
 
-        {/* Loading skeleton */}
-        {status === "loading" && (
-          <div className="loadingWrapper" role="status" aria-live="polite">
-            <div className="spinner" aria-hidden="true" />
-            <p className="loadingText">Processing your X-ray…</p>
-            <p className="loadingSteps">{LOADING_STEPS[stepIdx]}</p>
-          </div>
-        )}
+          {/* Analyze */}
+          <section aria-label="Run analysis">
+            <button
+              id="analyze-btn"
+              className="analyzeBtn"
+              disabled={!file || status === "loading"}
+              onClick={handleAnalyze}
+              aria-busy={status === "loading"}
+            >
+              {status === "loading" ? (
+                <><span className="spinner" aria-hidden="true" />Analyzing…</>
+              ) : (
+                "Analyze X-Ray"
+              )}
+            </button>
+          </section>
 
-        {/* Error */}
-        {status === "error" && (
-          <div className="errorBanner" role="alert">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" aria-hidden="true">
-              <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-            </svg>
-            <span><strong>Error:</strong> {error}</span>
-          </div>
-        )}
+          {/* Loading */}
+          {status === "loading" && (
+            <div className="loadingWrapper" role="status" aria-live="polite">
+              <div className="spinner" aria-hidden="true" />
+              <p className="loadingText">Processing your X-ray…</p>
+              <p className="loadingSteps">{LOADING_STEPS[stepIdx]}</p>
+            </div>
+          )}
 
-        {/* Step 3 — Results */}
-        {status === "done" && result && (() => {
-          const reportText = result.report?.raw_text ?? result.report ?? "";
-          const isInvalid  = reportText.toUpperCase().includes("## INVALID IMAGE");
+          {/* API error */}
+          {status === "error" && (
+            <div className="errorBanner" role="alert">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" aria-hidden="true">
+                <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+              </svg>
+              <span><strong>Error:</strong> {error}</span>
+            </div>
+          )}
 
-          if (isInvalid) {
-            return (
-              <div className="errorBanner" role="alert" style={{ alignItems: "flex-start", gap: 12 }}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" aria-hidden="true" style={{ flexShrink: 0, marginTop: 2 }}>
-                  <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-                </svg>
-                <div>
-                  <strong>Invalid Image</strong>
-                  <p style={{ margin: "4px 0 0", fontWeight: 400 }}>
-                    The uploaded file does not appear to be a chest X-ray. Please upload a valid PA or AP chest radiograph for AI-assisted analysis.
-                  </p>
-                </div>
+          {/* Invalid image */}
+          {status === "done" && result && isInvalid && (
+            <div className="errorBanner" role="alert" style={{ alignItems: "flex-start", gap: 12 }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" aria-hidden="true" style={{ flexShrink: 0, marginTop: 2 }}>
+                <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+              </svg>
+              <div>
+                <strong>Invalid Image</strong>
+                <p style={{ margin: "4px 0 0", fontWeight: 400 }}>
+                  The uploaded file does not appear to be a chest X-ray. Please upload a valid PA or AP chest radiograph for AI-assisted analysis.
+                </p>
               </div>
-            );
-          }
+            </div>
+          )}
 
-          return (
-            <section aria-labelledby="results-step-label">
-              <p id="results-step-label" className="stepLabel">Step 3 — Review Report</p>
+          {/* Report */}
+          {showChat && (
+            <section aria-label="Diagnosis report">
               <ReportCard
                 originalSrc={originalSrc.current}
                 originalDataUrl={originalDataUrl.current}
@@ -176,10 +166,18 @@ export default function App() {
                 reportText={reportText}
               />
             </section>
-          );
-        })()}
+          )}
 
-      </main>
+        </main>
+
+        {/* Right column — chat panel, only when report is ready */}
+        {showChat && (
+          <aside className="chatCol" aria-label="AI chat assistant">
+            <ChatPanel reportText={reportText} />
+          </aside>
+        )}
+
+      </div>
 
       {/* ── Footer ── */}
       <footer className="footer" role="contentinfo">
