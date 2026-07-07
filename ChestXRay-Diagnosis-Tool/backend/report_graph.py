@@ -80,6 +80,21 @@ def _confidence_table(all_probs: dict) -> str:
 
 def parse_sections(report: str, state: ReportState) -> dict:
     """Split the flat report text into named sections for the frontend editor."""
+
+    # ── Invalid image case ────────────────────────────────────────────────────
+    if "## INVALID IMAGE" in report.upper():
+        m = re.search(r"##\s*INVALID IMAGE\s*\n(.*)", report, re.DOTALL | re.IGNORECASE)
+        body = m.group(1).strip() if m else "The uploaded image is not a valid chest X-ray."
+        return {
+            "invalid": {
+                "key":      "invalid",
+                "title":    "Invalid Image",
+                "content":  body,
+                "editable": False,
+            }
+        }
+
+    # ── Normal report case ────────────────────────────────────────────────────
     def extract(header):
         m = re.search(
             rf"##\s*{re.escape(header)}\s*\n(.*?)(?=\n##\s|\Z)",
@@ -113,7 +128,7 @@ def parse_sections(report: str, state: ReportState) -> dict:
                 f"**AI Analysis:** Processed via DenseNet-121 Multi-Label Vision Model (v1.0)\n\n"
                 f"**AI Confidence Scores:**\n\n{conf_lines}"
             ),
-            "editable": False,   # raw model scores — should not be edited
+            "editable": False,
         },
         "findings": {
             "key":      "findings",
@@ -149,24 +164,37 @@ def scribe(state: ReportState) -> ReportState:
     if not state["feedback"]:
         context = fetch_context(state["disease"])
         conf_table = _confidence_table(state["all_probs"])
-        text_prompt = f"""You are a senior radiologist writing a structured chest X-ray report.
+        text_prompt = f"""You are a senior radiologist reviewing an uploaded medical image.
 
 You are provided with two images:
-- Image 1: The ORIGINAL chest X-ray
-- Image 2: The Grad-CAM heatmap (shows WHERE the AI model is focusing on the image)
+- Image 1: The UPLOADED IMAGE (check whether this is a chest X-ray)
+- Image 2: The Grad-CAM heatmap from an AI model
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 1 — IMAGE VALIDATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Look at Image 1. Is it a chest X-ray (a radiograph showing the thorax, ribcage, lungs, and heart)?
+
+If NO — output ONLY this and nothing else:
+
+## INVALID IMAGE
+The uploaded image does not appear to be a chest X-ray. A valid PA or AP chest radiograph of the thorax is required for AI-assisted analysis. Please re-upload a correct chest X-ray image.
+
+Do NOT produce any other sections. Stop here.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 2 — WRITE THE REPORT (only if Image 1 IS a chest X-ray)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 ⚠️ CRITICAL SAFETY RULES — YOU MUST FOLLOW THESE STRICTLY:
 1. You are NOT performing independent radiology. Do NOT diagnose anything by looking at the images yourself.
-2. The ONLY confirmed finding is what the AI model has already detected: **{state['disease']}** at **{state['probability'] * 100:.1f}% confidence**.
-3. Use Image 2 (Grad-CAM) ONLY to describe the spatial region highlighted — e.g. "The heatmap highlights the cardiac silhouette region" — not to make a new diagnosis.
-4. Do NOT mention, suggest, or imply any disease or finding that is NOT in the AI confidence scores below.
-5. For ALL areas the model did NOT flag, explicitly write "No acute abnormality detected by the AI model".
-6. Do NOT use phrases like "I observe", "I notice", or "appears to show" — you are NOT interpreting the images independently.
+2. The ONLY confirmed finding is what the AI model detected: **{state['disease']}** at **{state['probability'] * 100:.1f}% confidence**.
+3. Use Image 2 (Grad-CAM) ONLY to describe the specific anatomical region highlighted (e.g. "cardiac silhouette", "left lower lung zone"). Do NOT use it to make a new diagnosis.
+4. Write about ONLY **{state['disease']}**. Do NOT mention any other disease by name — not even to say it was not found.
+5. For areas NOT related to **{state['disease']}**, write "No acute abnormality detected by the AI model".
+6. Do NOT use phrases like "I observe", "I notice", or "appears to show".
 
-AI model confidence scores (reference these ONLY — do not diagnose beyond them):
-{conf_table}
-
-**Primary AI-detected finding: {state['disease']} at {state['probability'] * 100:.1f}%**
+Primary AI-detected finding: **{state['disease']}** at **{state['probability'] * 100:.1f}%**
 
 Relevant medical guideline extracts (use ONLY these for recommendations — do not invent clinical steps):
 {context}
@@ -178,29 +206,28 @@ Format: **bold** for key terms, bullet points for lists, no extra headings insid
 
 ## FINDINGS
 
-- **Lungs and Pleura:** [If {state['disease']} is Effusion or Pneumothorax, describe the AI-confirmed finding and use Image 2 to state which lung region is highlighted. Otherwise write: No acute abnormality detected by the AI model.]
-- **Heart and Mediastinum:** [If {state['disease']} is Cardiomegaly, describe the AI-confirmed finding and use Image 2 to state which cardiac region is highlighted. Otherwise write: No acute abnormality detected by the AI model.]
+- **Lungs and Pleura:** [Write here ONLY if {state['disease']} is Effusion or Pneumothorax. Use Image 2 to state which specific lung region is highlighted. For any other disease write: No acute abnormality detected by the AI model.]
+- **Heart and Mediastinum:** [Write here ONLY if {state['disease']} is Cardiomegaly. Use Image 2 to state which specific cardiac region is highlighted. For any other disease write: No acute abnormality detected by the AI model.]
 - **Bones and Soft Tissues:** No acute abnormality detected by the AI model.
 - **Hardware/Lines/Tubes:** None identified.
-- **Localization:** The Grad-CAM heatmap (Image 2) highlights the [describe the specific region — e.g. "left lower lung zone" or "cardiac silhouette"] as the region most associated with the AI model's detection of **{state['disease']}**.
+- **Localization:** The Grad-CAM heatmap (Image 2) highlights the [fill in the specific anatomical region you see highlighted in Image 2, e.g. "cardiac silhouette" or "right lower lung zone"] as the region most associated with the AI model's detection of **{state['disease']}**.
 
 ## IMPRESSION
 
-- **{state['disease']}** detected by AI model at **{state['probability'] * 100:.1f}% confidence**. [Add one sentence on clinical significance based on the guidelines.]
-- [For each other disease in the confidence scores that is below the 50% threshold, write one negative statement: e.g. "No AI evidence of Pneumothorax (confidence: X%).".]
+- **{state['disease']}** detected by the AI model at **{state['probability'] * 100:.1f}% confidence**. [Add one sentence on its clinical significance based on the provided guideline extracts.]
 
 ## RAG CLINICAL RECOMMENDATIONS
 
-Use ONLY the guideline extracts provided above. Do not invent any clinical step not present in the extracts.
+Use ONLY the guideline extracts above. Do not invent any step not present in those extracts.
 
-- **Suggested Action:** [One specific evidence-based step from the provided guideline extracts.]
-- **Regional Protocol Flag:** [If disease is Effusion: flag MoHFW/NTEP TB screening protocol. For all other diseases: state the relevant regional standard from the provided guideline extracts.]
+- **Suggested Action:** [One specific evidence-based next step from the provided guideline extracts for **{state['disease']}**.]
+- **Regional Protocol Flag:** [If {state['disease']} is Effusion: flag MoHFW/NTEP TB screening. For all other diseases: state the relevant regional standard from the provided guideline extracts.]
 
 ## MANDATORY AI SAFETY DISCLAIMER
 **ALERT:** This report was generated by an artificial intelligence triage assistant. The findings and suggested recommendations are for investigational and prioritization purposes only. This document does not constitute a final medical diagnosis and **must be independently verified by a licensed, board-certified physician before initiating any patient care**.
 """
 
-        # Build multimodal message: text + original X-ray + heatmap
+        # Build multimodal message: text + original image + heatmap
         message = HumanMessage(content=[
             {"type": "text", "text": text_prompt},
             {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{state['original_base64']}"}},
@@ -248,18 +275,26 @@ Output ONLY the corrected report text — no preamble, no commentary.
 # ── Node 2: Auditor ────────────────────────────────────────────────────────────
 def auditor(state: ReportState) -> ReportState:
     """Check the draft. Return PASS or FAIL+feedback."""
+
+    # ── Fast-pass for invalid image reports ───────────────────────────────────
+    if "## INVALID IMAGE" in state["draft"].upper():
+        sections = parse_sections(state["draft"], state)
+        return {**state, "final": state["draft"], "sections": sections, "feedback": ""}
+
+    # ── Normal checklist ──────────────────────────────────────────────────────
     prompt = f"""You are a medical safety auditor reviewing an AI-generated chest X-ray report.
+
+The ONLY confirmed disease for this report is: **{state['disease']}**.
 
 Check the draft against ALL of the following:
 1. Does it have a ## MANDATORY AI SAFETY DISCLAIMER section containing the word "physician"?
 2. Does it have a ## FINDINGS section with ALL five sub-areas: Lungs and Pleura, Heart and Mediastinum, Bones and Soft Tissues, Hardware/Lines/Tubes, Localization?
-3. Does the Localization line describe a SPECIFIC anatomical region (e.g. "cardiac silhouette", "left lower zone") — NOT just a generic placeholder phrase like "the region of the image"?
-4. Does it have a ## IMPRESSION section with bullet-point findings?
+3. Does the Localization line describe a SPECIFIC anatomical region (e.g. "cardiac silhouette", "left lower zone") — NOT just a generic placeholder like "the region of the image"?
+4. Does it have a ## IMPRESSION section with at least one bullet point?
 5. Does it have a ## RAG CLINICAL RECOMMENDATIONS section with at least one actionable step?
 6. If the disease is "Effusion", does it mention TB or NTEP screening?
 7. Does it correctly identify **{state['disease']}** as the primary finding?
-8. Does the FINDINGS section avoid mentioning any disease NOT in this list: {list(state['all_probs'].keys())}? (Hallucination check — no invented diagnoses allowed.)
-9. Does the IMPRESSION section include at least one negative statement (i.e. what was NOT found)?
+8. Does it mention ONLY **{state['disease']}** by name — NOT any other disease from this list: {[d for d in state['all_probs'].keys() if d != state['disease']]}? (Single-disease focus check.)
 
 Reply in EXACTLY this format and nothing else:
 
@@ -277,7 +312,7 @@ Draft:
 """
     response = llm.invoke(prompt).content.strip()
 
-    # Robust verdict extraction — handles extra whitespace or stray text after PASS
+    # Robust verdict extraction
     verdict_match = re.search(r"VERDICT:\s*(PASS|FAIL)", response, re.IGNORECASE)
     verdict = verdict_match.group(1).upper() if verdict_match else "FAIL"
 

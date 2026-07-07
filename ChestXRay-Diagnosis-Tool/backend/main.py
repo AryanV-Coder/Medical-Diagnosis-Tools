@@ -18,7 +18,7 @@ async def lifespan(app: FastAPI):
     yield
     model = None
 
-app = FastAPI(title="ChestXRay Diagnosis API", version="2.0.0", lifespan=lifespan)
+app = FastAPI(title="Dr. Chakshu API", version="2.0.0", lifespan=lifespan)
 
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 

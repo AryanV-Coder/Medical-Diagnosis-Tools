@@ -20,6 +20,9 @@ export default function ReportCard({
   const confidencePct = Math.round(probability * 100);
   const [downloading, setDownloading] = useState(false);
 
+  // Detect invalid image — hide all ML output in this case
+  const isInvalid = (reportText ?? "").toUpperCase().includes("## INVALID IMAGE");
+
   // Pre-fill the contenteditable div with rendered markdown on load
   useEffect(() => {
     if (editorRef.current) {
@@ -130,40 +133,46 @@ export default function ReportCard({
         {/* Title */}
         <p style={{ fontSize: 20, fontWeight: 700, marginBottom: 4 }}>Radiology Report — AI Assisted Draft</p>
         <p style={{ fontSize: 11, color: "#64748b", marginBottom: 28 }}>
-          Generated on {new Date().toLocaleString()} · ChestXRay Diagnosis Tool
+          Generated on {new Date().toLocaleString()} · Dr. Chakshu
         </p>
 
-        {/* Images */}
-        <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#94a3b8", marginBottom: 10 }}>Imaging</p>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 24 }}>
-          {[{ label: "Original X-Ray", src: imgSrc }, { label: "Grad-CAM Heatmap", src: heatmapSrc }].map(({ label, src }) => (
-            <div key={label} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.07em", textTransform: "uppercase", color: "#94a3b8" }}>{label}</span>
-              <img src={src} alt={label} style={{ width: "100%", aspectRatio: "1/1", objectFit: "contain", border: "1px solid #dde3ec", borderRadius: 8, background: "#f8fafc" }} crossOrigin="anonymous" />
+        {/* Images — hidden for invalid uploads */}
+        {!isInvalid && (
+          <>
+            <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#94a3b8", marginBottom: 10 }}>Imaging</p>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 24 }}>
+              {[{ label: "Original X-Ray", src: imgSrc }, { label: "Grad-CAM Heatmap", src: heatmapSrc }].map(({ label, src }) => (
+                <div key={label} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.07em", textTransform: "uppercase", color: "#94a3b8" }}>{label}</span>
+                  <img src={src} alt={label} style={{ width: "100%", aspectRatio: "1/1", objectFit: "contain", border: "1px solid #dde3ec", borderRadius: 8, background: "#f8fafc" }} crossOrigin="anonymous" />
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
+          </>
+        )}
 
-        {/* Findings */}
-        <div style={{ display: "flex", gap: 28, alignItems: "flex-start", background: "#f8fafc", border: "1px solid #dde3ec", borderRadius: 8, padding: "14px 18px", marginBottom: 24 }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-            <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#94a3b8" }}>Finding</span>
-            <span style={{ fontSize: 15, fontWeight: 600 }}>{disease}</span>
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-            <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#94a3b8" }}>Result</span>
-            <span style={{ display: "inline-flex", alignItems: "center", padding: "3px 10px", borderRadius: 99, fontSize: 12, fontWeight: 600, background: positive ? "#dcfce7" : "#fee2e2", color: positive ? "#15803d" : "#b91c1c" }}>
-              {positive ? "✓ Positive" : "✕ Negative"}
-            </span>
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-            <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#94a3b8" }}>AI Confidence</span>
-            <span style={{ fontSize: 15, fontWeight: 600 }}>{confidencePct}%</span>
-            <div style={{ height: 6, borderRadius: 99, background: "#e2e8f0", overflow: "hidden", width: 140, marginTop: 4 }}>
-              <div style={{ height: "100%", borderRadius: 99, background: "#1d4ed8", width: `${confidencePct}%` }} />
+        {/* Findings row — hidden for invalid uploads */}
+        {!isInvalid && (
+          <div style={{ display: "flex", gap: 28, alignItems: "flex-start", background: "#f8fafc", border: "1px solid #dde3ec", borderRadius: 8, padding: "14px 18px", marginBottom: 24 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+              <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#94a3b8" }}>Finding</span>
+              <span style={{ fontSize: 15, fontWeight: 600 }}>{disease}</span>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+              <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#94a3b8" }}>Result</span>
+              <span style={{ display: "inline-flex", alignItems: "center", padding: "3px 10px", borderRadius: 99, fontSize: 12, fontWeight: 600, background: positive ? "#dcfce7" : "#fee2e2", color: positive ? "#15803d" : "#b91c1c" }}>
+                {positive ? "✓ Positive" : "✕ Negative"}
+              </span>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+              <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#94a3b8" }}>AI Confidence</span>
+              <span style={{ fontSize: 15, fontWeight: 600 }}>{confidencePct}%</span>
+              <div style={{ height: 6, borderRadius: 99, background: "#e2e8f0", overflow: "hidden", width: 140, marginTop: 4 }}>
+                <div style={{ height: "100%", borderRadius: 99, background: "#1d4ed8", width: `${confidencePct}%` }} />
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
         {/* Report */}
         <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#94a3b8", marginBottom: 10 }}>Radiology Report</p>
@@ -179,7 +188,7 @@ export default function ReportCard({
 
         {/* Footer */}
         <div style={{ marginTop: 28, fontSize: 10, color: "#94a3b8", borderTop: "1px solid #e2e8f0", paddingTop: 10, display: "flex", justifyContent: "space-between" }}>
-          <span>ChestXRay Diagnosis Tool</span>
+          <span>Dr. Chakshu</span>
           <span>{new Date().toLocaleDateString()}</span>
         </div>
       </div>
@@ -187,51 +196,59 @@ export default function ReportCard({
       {/* ── Visible report card ── */}
       <section className={styles.card} aria-label="Diagnosis report">
 
-        <header className={styles.sectionHeader}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-            <circle cx="8.5" cy="8.5" r="1.5"/>
-            <polyline points="21 15 16 10 5 21"/>
-          </svg>
-          <span className={styles.sectionLabel}>Imaging</span>
-        </header>
+        {/* Images + Findings row — hidden for invalid uploads */}
+        {!isInvalid && (
+          <>
+            <header className={styles.sectionHeader}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                <circle cx="8.5" cy="8.5" r="1.5"/>
+                <polyline points="21 15 16 10 5 21"/>
+              </svg>
+              <span className={styles.sectionLabel}>Imaging</span>
+            </header>
 
-        <div className={styles.imageRow}>
-          <div className={styles.imageCell}>
-            <span className={styles.imageLabel}>Original X-Ray</span>
-            <img id="original-xray" src={originalSrc} alt="Original chest X-ray" className={styles.xrayImage} />
-          </div>
-          <div className={styles.imageCell}>
-            <span className={styles.imageLabel}>Grad-CAM Heatmap</span>
-            <img id="heatmap-image" src={heatmapSrc} alt="Grad-CAM activation heatmap" className={styles.xrayImage} />
-          </div>
-        </div>
+            <div className={styles.imageRow}>
+              <div className={styles.imageCell}>
+                <span className={styles.imageLabel}>Original X-Ray</span>
+                <img id="original-xray" src={originalSrc} alt="Original chest X-ray" className={styles.xrayImage} />
+              </div>
+              <div className={styles.imageCell}>
+                <span className={styles.imageLabel}>Grad-CAM Heatmap</span>
+                <img id="heatmap-image" src={heatmapSrc} alt="Grad-CAM activation heatmap" className={styles.xrayImage} />
+              </div>
+            </div>
+          </>
+        )}
 
-        <div className={styles.findingsRow} role="region" aria-label="Findings summary">
-          <div className={styles.findingItem}>
-            <span className={styles.findingKey}>Finding</span>
-            <span className={styles.findingValue} id="finding-disease">{disease}</span>
-          </div>
-          <div className={styles.divider} aria-hidden="true" />
-          <div className={styles.findingItem}>
-            <span className={styles.findingKey}>Result</span>
-            <span id="finding-result" className={`${styles.pill} ${positive ? styles.pillPositive : styles.pillNegative}`} role="status">
-              {positive ? (
-                <><svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20.285 6.709a1 1 0 0 0-1.414 0L9 16.586l-3.871-3.871a1 1 0 1 0-1.414 1.414l4.578 4.578a1 1 0 0 0 1.414 0l10.578-10.584a1 1 0 0 0 0-1.414z"/></svg>Positive</>
-              ) : (
-                <><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Negative</>
-              )}
-            </span>
-          </div>
-          <div className={styles.divider} aria-hidden="true" />
-          <div className={`${styles.findingItem} ${styles.confidenceMeter}`}>
-            <span className={styles.findingKey}>AI Confidence</span>
-            <span className={styles.findingValue} id="finding-confidence">{confidencePct}%</span>
-            <div className={styles.meterTrack} role="progressbar" aria-valuenow={confidencePct} aria-valuemin={0} aria-valuemax={100}>
-              <div className={styles.meterFill} style={{ width: `${confidencePct}%` }} />
+        {/* Findings summary row — hidden for invalid uploads */}
+        {!isInvalid && (
+          <div className={styles.findingsRow} role="region" aria-label="Findings summary">
+            <div className={styles.findingItem}>
+              <span className={styles.findingKey}>Finding</span>
+              <span className={styles.findingValue} id="finding-disease">{disease}</span>
+            </div>
+            <div className={styles.divider} aria-hidden="true" />
+            <div className={styles.findingItem}>
+              <span className={styles.findingKey}>Result</span>
+              <span id="finding-result" className={`${styles.pill} ${positive ? styles.pillPositive : styles.pillNegative}`} role="status">
+                {positive ? (
+                  <><svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20.285 6.709a1 1 0 0 0-1.414 0L9 16.586l-3.871-3.871a1 1 0 1 0-1.414 1.414l4.578 4.578a1 1 0 0 0 1.414 0l10.578-10.584a1 1 0 0 0 0-1.414z"/></svg>Positive</>
+                ) : (
+                  <><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Negative</>
+                )}
+              </span>
+            </div>
+            <div className={styles.divider} aria-hidden="true" />
+            <div className={`${styles.findingItem} ${styles.confidenceMeter}`}>
+              <span className={styles.findingKey}>AI Confidence</span>
+              <span className={styles.findingValue} id="finding-confidence">{confidencePct}%</span>
+              <div className={styles.meterTrack} role="progressbar" aria-valuenow={confidencePct} aria-valuemin={0} aria-valuemax={100}>
+                <div className={styles.meterFill} style={{ width: `${confidencePct}%` }} />
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
         <div className={styles.reportSection}>
           <div className={styles.reportHeader}>

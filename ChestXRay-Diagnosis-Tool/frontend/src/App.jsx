@@ -85,7 +85,7 @@ export default function App() {
             </svg>
           </div>
           <div className="headerText">
-            <h1 className="headerTitle">ChestXRay Diagnosis Tool</h1>
+            <h1 className="headerTitle">Dr. Chakshu</h1>
             <p className="headerSub">AI-assisted radiology report generation</p>
           </div>
         </div>
@@ -143,26 +143,47 @@ export default function App() {
         )}
 
         {/* Step 3 — Results */}
-        {status === "done" && result && (
-          <section aria-labelledby="results-step-label">
-            <p id="results-step-label" className="stepLabel">Step 3 — Review Report</p>
-            <ReportCard
-              originalSrc={originalSrc.current}
-              originalDataUrl={originalDataUrl.current}
-              heatmapBase64={result.heatmap_base64}
-              disease={result.disease}
-              probability={result.probability}
-              positive={result.positive}
-              reportText={result.report?.raw_text ?? result.report ?? ""}
-            />
-          </section>
-        )}
+        {status === "done" && result && (() => {
+          const reportText = result.report?.raw_text ?? result.report ?? "";
+          const isInvalid  = reportText.toUpperCase().includes("## INVALID IMAGE");
+
+          if (isInvalid) {
+            return (
+              <div className="errorBanner" role="alert" style={{ alignItems: "flex-start", gap: 12 }}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" aria-hidden="true" style={{ flexShrink: 0, marginTop: 2 }}>
+                  <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                </svg>
+                <div>
+                  <strong>Invalid Image</strong>
+                  <p style={{ margin: "4px 0 0", fontWeight: 400 }}>
+                    The uploaded file does not appear to be a chest X-ray. Please upload a valid PA or AP chest radiograph for AI-assisted analysis.
+                  </p>
+                </div>
+              </div>
+            );
+          }
+
+          return (
+            <section aria-labelledby="results-step-label">
+              <p id="results-step-label" className="stepLabel">Step 3 — Review Report</p>
+              <ReportCard
+                originalSrc={originalSrc.current}
+                originalDataUrl={originalDataUrl.current}
+                heatmapBase64={result.heatmap_base64}
+                disease={result.disease}
+                probability={result.probability}
+                positive={result.positive}
+                reportText={reportText}
+              />
+            </section>
+          );
+        })()}
 
       </main>
 
       {/* ── Footer ── */}
       <footer className="footer" role="contentinfo">
-        For clinical use only. AI output must be reviewed by a licensed radiologist. &copy; {new Date().getFullYear()} ChestXRay Diagnosis Tool.
+        For clinical use only. AI output must be reviewed by a licensed radiologist. &copy; {new Date().getFullYear()} Dr. Chakshu.
       </footer>
 
     </div>
