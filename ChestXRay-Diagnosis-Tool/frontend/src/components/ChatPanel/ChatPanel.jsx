@@ -134,6 +134,54 @@ export default function ChatPanel({ reportText }) {
             key={i}
             className={`${styles.messageRow} ${msg.role === "user" ? styles.messageRowUser : styles.messageRowAssistant}`}
           >
+            {/* Tool Calls (Thought Process) */}
+            {msg.role === "assistant" && msg.intermediateSteps?.length > 0 && (
+              <details style={{ marginBottom: 8, fontSize: "13px", background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 6, overflow: "hidden" }}>
+                <summary style={{ padding: "8px 12px", cursor: "pointer", color: "#475569", fontWeight: 500, display: "flex", alignItems: "center", gap: 8, userSelect: "none", outline: "none" }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 2l2.4 7.6 7.6 2.4-7.6 2.4L12 22l-2.4-7.6-7.6-2.4 7.6-2.4L12 2z" />
+                  </svg>
+                  Thought process
+                </summary>
+                <div style={{ padding: "10px 12px", borderTop: "1px solid #e2e8f0", color: "#334155", maxHeight: 250, overflowY: "auto", display: "flex", flexDirection: "column", gap: 10 }}>
+                  {msg.intermediateSteps.map((step, si) => {
+                    // Hide raw database observations from the user
+                    if (step.type === "observation") return null;
+
+                    if (step.type === "thought") {
+                      return (
+                        <div key={si} style={{ lineHeight: 1.5 }}>
+                          {step.output}
+                        </div>
+                      );
+                    }
+
+                    if (step.type === "action") {
+                      // Map technical tool names to user-friendly status updates
+                      let actionText = "Searching medical knowledge...";
+                      if (step.tool === "clinical_web_search") {
+                        actionText = "Searching clinical guidelines...";
+                      } else if (step.tool.endsWith("_db")) {
+                        actionText = "Searching internal knowledge base...";
+                      }
+
+                      const query = step.input?.query;
+
+                      return (
+                        <div key={si} style={{ color: "#2563eb", display: "flex", alignItems: "center", gap: 6, fontWeight: 500 }}>
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                          </svg>
+                          {actionText} {query && <span style={{ color: "#64748b", fontWeight: 400 }}>"{query}"</span>}
+                        </div>
+                      );
+                    }
+                    return null;
+                  })}
+                </div>
+              </details>
+            )}
+
             <div
               className={`${styles.bubble} ${msg.role === "user" ? styles.bubbleUser : styles.bubbleAssistant}`}
               // Use dangerouslySetInnerHTML only for assistant markdown rendering
@@ -143,34 +191,7 @@ export default function ChatPanel({ reportText }) {
               )}
             />
 
-            {/* Tool Calls (Thought Process) */}
-            {msg.role === "assistant" && msg.intermediateSteps?.length > 0 && (
-              <details style={{ marginTop: 8, fontSize: "12px", background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 6, overflow: "hidden" }}>
-                <summary style={{ padding: "6px 10px", cursor: "pointer", color: "#64748b", fontWeight: 500, display: "flex", alignItems: "center", gap: 6, userSelect: "none", outline: "none" }}>
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
-                    <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
-                  </svg>
-                  View agent thought process ({msg.intermediateSteps.length} steps)
-                </summary>
-                <div style={{ padding: "8px 10px", borderTop: "1px solid #e2e8f0", color: "#475569", maxHeight: 200, overflowY: "auto", display: "flex", flexDirection: "column", gap: 8 }}>
-                  {msg.intermediateSteps.map((step, si) => (
-                    <div key={si} style={{ background: "#fff", padding: 6, borderRadius: 4, border: "1px solid #f1f5f9" }}>
-                      {step.type === "action" ? (
-                        <>
-                          <div style={{ color: "#2563eb", fontWeight: 600, marginBottom: 2 }}>🛠 Tool: {step.tool}</div>
-                          <div style={{ fontFamily: "monospace", fontSize: "11px", color: "#64748b" }}>Input: {JSON.stringify(step.input)}</div>
-                        </>
-                      ) : (
-                        <>
-                          <div style={{ color: "#16a34a", fontWeight: 600, marginBottom: 2 }}>👁 Result:</div>
-                          <div style={{ fontSize: "11px", lineHeight: 1.4 }}>{step.output}</div>
-                        </>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </details>
-            )}
+
           </div>
         ))}
 

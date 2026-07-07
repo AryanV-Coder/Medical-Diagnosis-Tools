@@ -26,9 +26,8 @@ export async function sendChatMessage({ sessionId, message, reportContext }) {
 
   const data = await res.json();
   return {
-    sessionId:  data.session_id,
-    answer:     data.answer,
-    dbsQueried: data.dbs_queried ?? [],
-    sources:    data.sources    ?? [],
+    sessionId:         data.session_id,
+    answer:            data.answer,
+    intermediateSteps: data.intermediate_steps ?? [],
   };
 }

@@ -41,6 +41,11 @@ def _format_intermediate_steps(messages: list) -> list[dict]:
     # we'll look at the tail of the conversation for recent tool usage.
     for msg in messages:
         if isinstance(msg, AIMessage) and msg.tool_calls:
+            if msg.content:
+                steps.append({
+                    "type": "thought",
+                    "output": msg.content
+                })
             for tc in msg.tool_calls:
                 steps.append({
                     "type": "action",

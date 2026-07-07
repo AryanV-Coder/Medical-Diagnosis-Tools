@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import "./App.css";
 import UploadPanel from "./components/UploadPanel/UploadPanel";
 import ReportCard from "./components/ReportCard/ReportCard";
@@ -20,6 +20,43 @@ export default function App() {
   const stepTimer               = useRef(null);
   const originalSrc             = useRef(null);
   const originalDataUrl         = useRef(null);
+
+  // ── Resizable chat panel ──
+  const [chatWidth, setChatWidth] = useState(420);
+  const isResizing                = useRef(false);
+  const startX                    = useRef(0);
+  const startWidth                = useRef(420);
+
+  const onResizeStart = useCallback((e) => {
+    isResizing.current   = true;
+    startX.current       = e.clientX;
+    startWidth.current   = chatWidth;
+    document.body.style.cursor     = "col-resize";
+    document.body.style.userSelect = "none";
+  }, [chatWidth]);
+
+  useEffect(() => {
+    const onMouseMove = (e) => {
+      if (!isResizing.current) return;
+      // Drag LEFT → handle moves left → chat gets wider, report shrinks
+      // Drag RIGHT → handle moves right → report gets wider, chat shrinks
+      const delta = startX.current - e.clientX;  // left drag = positive
+      const next  = Math.min(720, Math.max(280, startWidth.current + delta));
+      setChatWidth(next);
+    };
+    const onMouseUp = () => {
+      if (!isResizing.current) return;
+      isResizing.current             = false;
+      document.body.style.cursor     = "";
+      document.body.style.userSelect = "";
+    };
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup",   onMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup",   onMouseUp);
+    };
+  }, []);
 
   // Derived values lifted to component scope
   const reportText = result?.report?.raw_text ?? result?.report ?? "";
@@ -94,8 +131,12 @@ export default function App() {
       {/* ── Page body ── */}
       <div className={`pageBody${showChat ? " pageBody--chat" : ""}`}>
 
-        {/* Left column */}
-        <main className={`contentCol${showChat ? "" : " contentCol--narrow"}`} id="main-content">
+        {/* Left column — fluid, shrinks as chat grows */}
+        <main
+          className={`contentCol${showChat ? "" : " contentCol--narrow"}`}
+          id="main-content"
+          style={showChat ? { flex: "1 1 0", minWidth: 300, maxWidth: "none" } : {}}
+        >
 
           {/* Hero — only shown before a report is ready */}
           {!showChat && status === "idle" && (
@@ -203,11 +244,24 @@ export default function App() {
 
         </main>
 
-        {/* Right column — chat panel, only when report is ready */}
+        {/* Resize handle + right chat column */}
         {showChat && (
-          <aside className="chatCol" aria-label="AI chat assistant">
-            <ChatPanel reportText={reportText} />
-          </aside>
+          <>
+            {/* ── Drag handle ── */}
+            <div
+              aria-hidden="true"
+              onMouseDown={onResizeStart}
+              className="resizeHandle"
+            />
+
+            <aside
+              className="chatCol"
+              aria-label="AI chat assistant"
+              style={{ flex: `0 0 ${chatWidth}px`, width: `${chatWidth}px` }}
+            >
+              <ChatPanel reportText={reportText} />
+            </aside>
+          </>
         )}
 
       </div>
