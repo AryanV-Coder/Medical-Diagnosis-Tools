@@ -62,8 +62,9 @@ def to_base64_png(array):
 def run_full_pipeline(model, raw_bytes: bytes):
     """
     Main entry point — given a model and raw image bytes, return a dict for
-    the single highest-probability disease:
+    the single highest-probability disease plus all confidence scores:
       - disease name, probability, positive flag, heatmap (base64 PNG), raw grayscale map
+      - all_probs: {disease: probability} for every disease (used in the report header)
     """
     tensor, rgb = load_image(raw_bytes)
     probs = get_predictions(model, tensor)
@@ -75,9 +76,11 @@ def run_full_pipeline(model, raw_bytes: bytes):
     overlay, grayscale = get_gradcam(model, tensor, rgb, best_idx)
 
     return {
-        "disease":        best_disease,
-        "probability":    round(float(probs[best_idx]), 4),
-        "positive":       bool(probs[best_idx] >= THRESHOLD),
-        "heatmap_base64": to_base64_png(overlay),
-        "grayscale_map":  grayscale.tolist(),
+        "disease":         best_disease,
+        "probability":     round(float(probs[best_idx]), 4),
+        "positive":        bool(probs[best_idx] >= THRESHOLD),
+        "all_probs":       {d: round(float(p), 4) for d, p in zip(DISEASES, probs)},
+        "original_base64": to_base64_png((rgb * 255).astype(np.uint8)),
+        "heatmap_base64":  to_base64_png(overlay),
+        "grayscale_map":   grayscale.tolist(),
     }

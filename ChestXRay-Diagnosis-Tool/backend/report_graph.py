@@ -6,6 +6,7 @@ from typing import TypedDict
 from dotenv import load_dotenv
 from langchain_community.vectorstores import FAISS
 from langchain_groq import ChatGroq
+from langchain_core.messages import HumanMessage
 from langchain_huggingface import HuggingFaceEndpointEmbeddings
 from langgraph.graph import StateGraph, END
 
@@ -24,6 +25,14 @@ embeddings = HuggingFaceEndpointEmbeddings(
     huggingfacehub_api_token=os.getenv("HF_TOKEN"),
 )
 
+# Vision model for the Scribe — sees both images
+vision_llm = ChatGroq(
+    model="meta-llama/llama-4-scout-17b-16e-instruct",
+    api_key=os.getenv("GROQ_API_KEY"),
+    temperature=0.3,
+)
+
+# Text-only model for the Auditor — just checks the text draft
 llm = ChatGroq(
     model="llama-3.3-70b-versatile",
     api_key=os.getenv("GROQ_API_KEY"),
@@ -33,20 +42,22 @@ llm = ChatGroq(
 
 # ── State ──────────────────────────────────────────────────────────────────────
 class ReportState(TypedDict):
-    disease:      str
-    probability:  float
-    positive:     bool
-    context:      str
-    draft:        str          # Scribe's current draft
-    feedback:     str          # Auditor's feedback (empty string = approved)
-    final:        str
-    sections:     dict
-    iterations:   int          # safety counter to avoid infinite loops
+    disease:         str
+    probability:     float
+    positive:        bool
+    all_probs:       dict   # {"Cardiomegaly": 0.85, "Effusion": 0.12, "Pneumothorax": 0.02}
+    original_base64: str   # base64 PNG of the original X-ray
+    heatmap_base64:  str   # base64 PNG of the Grad-CAM heatmap
+    context:         str
+    draft:           str
+    feedback:        str
+    final:           str
+    sections:        dict
+    iterations:      int
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 def fetch_context(disease: str) -> str:
-    """Load relevant FAISS indexes and return top guideline chunks as a string."""
     chunks = []
     for name in RETRIEVAL_MAP.get(disease, ["xraydictionary"]):
         index = FAISS.load_local(
@@ -54,91 +65,205 @@ def fetch_context(disease: str) -> str:
             embeddings,
             allow_dangerous_deserialization=True,
         )
-        docs = index.similarity_search(f"{disease} chest xray diagnosis", k=3)
+        docs = index.similarity_search(f"{disease} chest xray diagnosis management", k=3)
         chunks.extend(d.page_content for d in docs)
     return "\n\n---\n\n".join(chunks)
+
+
+def _confidence_table(all_probs: dict) -> str:
+    """Build a formatted confidence table string for injection into the prompt."""
+    lines = []
+    for disease, prob in all_probs.items():
+        lines.append(f"  - **{disease}:** {prob * 100:.1f}%")
+    return "\n".join(lines)
 
 
 def parse_sections(report: str, state: ReportState) -> dict:
     """Split the flat report text into named sections for the frontend editor."""
     def extract(header):
-        m = re.search(rf"##\s*{re.escape(header)}\s*\n(.*?)(?=\n##\s|\Z)", report, re.DOTALL | re.IGNORECASE)
+        m = re.search(
+            rf"##\s*{re.escape(header)}\s*\n(.*?)(?=\n##\s|\Z)",
+            report, re.DOTALL | re.IGNORECASE
+        )
         return m.group(1).strip() if m else ""
 
+    now = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
+    conf_lines = "\n\n".join(
+        f"**{d}:** {p * 100:.1f}%" for d, p in state["all_probs"].items()
+    )
+
     return {
-        "title":           {"key": "title",           "title": "Report Title",        "content": "RADIOLOGY REPORT — AI ASSISTED DRAFT",                                                                                                                        "editable": True},
-        "patient_info":    {"key": "patient_info",    "title": "Patient Information", "content": f"**Disease detected:** {state['disease']}\n\n**AI Confidence:** {state['probability']:.1%}\n\n**Positive finding:** {'Yes' if state['positive'] else 'No'}\n\n**Date:** {datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}", "editable": True},
-        "findings":        {"key": "findings",        "title": "Findings",            "content": extract("FINDINGS"),          "editable": True},
-        "impression":      {"key": "impression",      "title": "Clinical Impression", "content": extract("CLINICAL IMPRESSION"), "editable": True},
-        "recommendations": {"key": "recommendations", "title": "Recommendations",     "content": extract("RECOMMENDATIONS"),    "editable": True},
-        "disclaimer":      {"key": "disclaimer",      "title": "Disclaimer",          "content": extract("DISCLAIMER"),         "editable": False},
+        "demographics": {
+            "key":      "demographics",
+            "title":    "Patient Demographics & Exam Details",
+            "content":  (
+                f"**Study:** Digital Chest X-Ray (CXR)\n\n"
+                f"**Date/Time of Exam:** {now}\n\n"
+                f"**Views:** PA / AP (specify on review)\n\n"
+                f"**Clinical Indication:** To be completed by reviewing physician\n\n"
+                f"**Comparison:** None available"
+            ),
+            "editable": True,
+        },
+        "technique": {
+            "key":      "technique",
+            "title":    "Technique & AI Processing",
+            "content":  (
+                f"**Imaging Technique:** Standard digital radiography\n\n"
+                f"**AI Analysis:** Processed via DenseNet-121 Multi-Label Vision Model (v1.0)\n\n"
+                f"**AI Confidence Scores:**\n\n{conf_lines}"
+            ),
+            "editable": False,   # raw model scores — should not be edited
+        },
+        "findings": {
+            "key":      "findings",
+            "title":    "Findings",
+            "content":  extract("FINDINGS"),
+            "editable": True,
+        },
+        "impression": {
+            "key":      "impression",
+            "title":    "Impression",
+            "content":  extract("IMPRESSION"),
+            "editable": True,
+        },
+        "recommendations": {
+            "key":      "recommendations",
+            "title":    "RAG Clinical Recommendations (Lifecycle/Triage)",
+            "content":  extract("RAG CLINICAL RECOMMENDATIONS"),
+            "editable": True,
+        },
+        "disclaimer": {
+            "key":      "disclaimer",
+            "title":    "Mandatory AI Safety Disclaimer",
+            "content":  extract("MANDATORY AI SAFETY DISCLAIMER"),
+            "editable": False,
+        },
     }
 
 
 # ── Node 1: Scribe ─────────────────────────────────────────────────────────────
 def scribe(state: ReportState) -> ReportState:
-    """Write (or rewrite) the report. If feedback exists, fix based on it."""
+    """Write (or rewrite) the report. Sends both images to the vision model."""
 
-    # First run: fetch context and write from scratch
-    # Subsequent runs: fix the draft based on auditor's feedback
     if not state["feedback"]:
         context = fetch_context(state["disease"])
-        prompt = f"""You are a senior radiologist. Write a structured clinical radiology report.
+        conf_table = _confidence_table(state["all_probs"])
+        text_prompt = f"""You are a senior radiologist writing a structured chest X-ray report.
 
-Use exactly these four section headers (with ## prefix):
-## FINDINGS
-## CLINICAL IMPRESSION
-## RECOMMENDATIONS
-## DISCLAIMER
+You are provided with two images:
+- Image 1: The ORIGINAL chest X-ray
+- Image 2: The Grad-CAM heatmap (shows WHERE the AI model is focusing on the image)
 
-Formatting rules (this report will be rendered as a document):
-- Use **bold** for medical terms, disease names, and key values
-- Use bullet points ( - ) for lists
-- Keep each section concise and professional
-- Do NOT use any other Markdown headings inside sections
+⚠️ CRITICAL SAFETY RULES — YOU MUST FOLLOW THESE STRICTLY:
+1. You are NOT performing independent radiology. Do NOT diagnose anything by looking at the images yourself.
+2. The ONLY confirmed finding is what the AI model has already detected: **{state['disease']}** at **{state['probability'] * 100:.1f}% confidence**.
+3. Use Image 2 (Grad-CAM) ONLY to describe the spatial region highlighted — e.g. "The heatmap highlights the cardiac silhouette region" — not to make a new diagnosis.
+4. Do NOT mention, suggest, or imply any disease or finding that is NOT in the AI confidence scores below.
+5. For ALL areas the model did NOT flag, explicitly write "No acute abnormality detected by the AI model".
+6. Do NOT use phrases like "I observe", "I notice", or "appears to show" — you are NOT interpreting the images independently.
 
-Disease detected : **{state['disease']}**
-AI Confidence    : **{state['probability']:.1%}**
-Positive finding : **{'Yes' if state['positive'] else 'No'}**
+AI model confidence scores (reference these ONLY — do not diagnose beyond them):
+{conf_table}
 
-Guideline extracts:
+**Primary AI-detected finding: {state['disease']} at {state['probability'] * 100:.1f}%**
+
+Relevant medical guideline extracts (use ONLY these for recommendations — do not invent clinical steps):
 {context}
-"""
-    else:
-        context = state["context"]  # reuse already-fetched context
-        prompt = f"""You are a senior radiologist. Your previous report draft had issues.
 
-The auditor gave this feedback:
+---
+
+Write ONLY the following four sections using these EXACT headers (## prefix).
+Format: **bold** for key terms, bullet points for lists, no extra headings inside sections.
+
+## FINDINGS
+
+- **Lungs and Pleura:** [If {state['disease']} is Effusion or Pneumothorax, describe the AI-confirmed finding and use Image 2 to state which lung region is highlighted. Otherwise write: No acute abnormality detected by the AI model.]
+- **Heart and Mediastinum:** [If {state['disease']} is Cardiomegaly, describe the AI-confirmed finding and use Image 2 to state which cardiac region is highlighted. Otherwise write: No acute abnormality detected by the AI model.]
+- **Bones and Soft Tissues:** No acute abnormality detected by the AI model.
+- **Hardware/Lines/Tubes:** None identified.
+- **Localization:** The Grad-CAM heatmap (Image 2) highlights the [describe the specific region — e.g. "left lower lung zone" or "cardiac silhouette"] as the region most associated with the AI model's detection of **{state['disease']}**.
+
+## IMPRESSION
+
+- **{state['disease']}** detected by AI model at **{state['probability'] * 100:.1f}% confidence**. [Add one sentence on clinical significance based on the guidelines.]
+- [For each other disease in the confidence scores that is below the 50% threshold, write one negative statement: e.g. "No AI evidence of Pneumothorax (confidence: X%).".]
+
+## RAG CLINICAL RECOMMENDATIONS
+
+Use ONLY the guideline extracts provided above. Do not invent any clinical step not present in the extracts.
+
+- **Suggested Action:** [One specific evidence-based step from the provided guideline extracts.]
+- **Regional Protocol Flag:** [If disease is Effusion: flag MoHFW/NTEP TB screening protocol. For all other diseases: state the relevant regional standard from the provided guideline extracts.]
+
+## MANDATORY AI SAFETY DISCLAIMER
+**ALERT:** This report was generated by an artificial intelligence triage assistant. The findings and suggested recommendations are for investigational and prioritization purposes only. This document does not constitute a final medical diagnosis and **must be independently verified by a licensed, board-certified physician before initiating any patient care**.
+"""
+
+        # Build multimodal message: text + original X-ray + heatmap
+        message = HumanMessage(content=[
+            {"type": "text", "text": text_prompt},
+            {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{state['original_base64']}"}},
+            {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{state['heatmap_base64']}"}},
+        ])
+        draft = vision_llm.invoke([message]).content
+
+    else:
+        context = state["context"]
+        # Revision also uses the vision model with images —
+        # some auditor checks (e.g. Localization too generic) require seeing Image 2 to fix properly
+        revision_prompt = f"""You are a senior radiologist revising a chest X-ray report.
+
+You are provided with the same two images as before:
+- Image 1: The ORIGINAL chest X-ray
+- Image 2: The Grad-CAM heatmap (shows WHERE the AI model is focusing)
+
+⚠️ SAFETY RULES (same as the original draft — do not violate these during revision):
+1. Do NOT add any new diagnosis or finding beyond what the AI model already detected: **{state['disease']}** at **{state['probability'] * 100:.1f}%**.
+2. Do NOT invent clinical recommendations not present in the original draft's guideline extracts.
+3. Do NOT use phrases like "I observe" or "appears to show".
+4. For all unflagged areas, keep the "No acute abnormality detected by the AI model" phrasing.
+
+The auditor flagged these specific issues with your previous draft:
 {state['feedback']}
 
-Here is your previous draft:
+Your previous draft:
 {state['draft']}
 
-Fix ONLY the issues mentioned in the feedback. Keep everything else unchanged.
+Fix ONLY the flagged issues. Keep all other content exactly as is.
 Preserve all Markdown formatting (**bold**, bullet points).
-Keep the same four section headers: ## FINDINGS, ## CLINICAL IMPRESSION, ## RECOMMENDATIONS, ## DISCLAIMER.
-Output only the corrected report text, nothing else.
+Keep the same four section headers: ## FINDINGS, ## IMPRESSION, ## RAG CLINICAL RECOMMENDATIONS, ## MANDATORY AI SAFETY DISCLAIMER.
+Output ONLY the corrected report text — no preamble, no commentary.
 """
+        message = HumanMessage(content=[
+            {"type": "text", "text": revision_prompt},
+            {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{state['original_base64']}"}},
+            {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{state['heatmap_base64']}"}},
+        ])
+        draft = vision_llm.invoke([message]).content
 
-    draft = llm.invoke(prompt).content
     return {**state, "context": context, "draft": draft, "feedback": "", "iterations": state["iterations"] + 1}
 
 
 # ── Node 2: Auditor ────────────────────────────────────────────────────────────
 def auditor(state: ReportState) -> ReportState:
-    """Check the draft. If issues found, return feedback. If clean, approve."""
-    prompt = f"""You are a medical safety auditor reviewing a radiology report draft.
+    """Check the draft. Return PASS or FAIL+feedback."""
+    prompt = f"""You are a medical safety auditor reviewing an AI-generated chest X-ray report.
 
-Check the draft against this checklist:
-1. Has a ## DISCLAIMER section stating it must be reviewed by a licensed radiologist?
-2. Correctly names **{state['disease']}** as the detected disease?
-3. Has a ## RECOMMENDATIONS section with at least 2 actionable steps?
-4. If disease is Effusion, does it mention TB or NTEP screening?
+Check the draft against ALL of the following:
+1. Does it have a ## MANDATORY AI SAFETY DISCLAIMER section containing the word "physician"?
+2. Does it have a ## FINDINGS section with ALL five sub-areas: Lungs and Pleura, Heart and Mediastinum, Bones and Soft Tissues, Hardware/Lines/Tubes, Localization?
+3. Does the Localization line describe a SPECIFIC anatomical region (e.g. "cardiac silhouette", "left lower zone") — NOT just a generic placeholder phrase like "the region of the image"?
+4. Does it have a ## IMPRESSION section with bullet-point findings?
+5. Does it have a ## RAG CLINICAL RECOMMENDATIONS section with at least one actionable step?
+6. If the disease is "Effusion", does it mention TB or NTEP screening?
+7. Does it correctly identify **{state['disease']}** as the primary finding?
+8. Does the FINDINGS section avoid mentioning any disease NOT in this list: {list(state['all_probs'].keys())}? (Hallucination check — no invented diagnoses allowed.)
+9. Does the IMPRESSION section include at least one negative statement (i.e. what was NOT found)?
 
-Reply in this exact format:
+Reply in EXACTLY this format and nothing else:
 
 VERDICT: PASS
-(if all checks pass — nothing else needed)
 
 or
 
@@ -146,27 +271,27 @@ VERDICT: FAIL
 FEEDBACK:
 - [specific issue 1]
 - [specific issue 2]
-(list only what needs to be fixed, be precise)
 
 Draft:
 {state['draft']}
 """
     response = llm.invoke(prompt).content.strip()
 
-    if response.upper().startswith("VERDICT: PASS"):
-        # Approved — parse sections and mark as done
+    # Robust verdict extraction — handles extra whitespace or stray text after PASS
+    verdict_match = re.search(r"VERDICT:\s*(PASS|FAIL)", response, re.IGNORECASE)
+    verdict = verdict_match.group(1).upper() if verdict_match else "FAIL"
+
+    if verdict == "PASS":
         sections = parse_sections(state["draft"], state)
         return {**state, "final": state["draft"], "sections": sections, "feedback": ""}
     else:
-        # Extract the feedback lines and send back to Scribe
-        feedback = response.replace("VERDICT: FAIL", "").replace("FEEDBACK:", "").strip()
+        feedback_match = re.search(r"FEEDBACK:\s*(.*)", response, re.DOTALL | re.IGNORECASE)
+        feedback = feedback_match.group(1).strip() if feedback_match else response
         return {**state, "feedback": feedback}
 
 
-# ── Conditional edge: route based on auditor verdict ──────────────────────────
+# ── Conditional edge ───────────────────────────────────────────────────────────
 def route_after_auditor(state: ReportState) -> str:
-    # If approved (feedback is empty and final is set), go to END
-    # Safety cap: max 3 iterations to avoid infinite loops
     if not state["feedback"] or state["iterations"] >= 3:
         return END
     return "scribe"
@@ -183,17 +308,27 @@ report_graph = graph.compile()
 
 
 # ── Public function ────────────────────────────────────────────────────────────
-def generate_report(disease: str, probability: float, positive: bool) -> dict:
+def generate_report(
+    disease: str,
+    probability: float,
+    positive: bool,
+    all_probs: dict,
+    original_base64: str,
+    heatmap_base64: str,
+) -> dict:
     result = report_graph.invoke({
-        "disease":     disease,
-        "probability": probability,
-        "positive":    positive,
-        "context":     "",
-        "draft":       "",
-        "feedback":    "",
-        "final":       "",
-        "sections":    {},
-        "iterations":  0,
+        "disease":         disease,
+        "probability":     probability,
+        "positive":        positive,
+        "all_probs":       all_probs,
+        "original_base64": original_base64,
+        "heatmap_base64":  heatmap_base64,
+        "context":         "",
+        "draft":           "",
+        "feedback":        "",
+        "final":           "",
+        "sections":        {},
+        "iterations":      0,
     })
     return {
         "raw_text": result["final"],

@@ -49,6 +49,9 @@ async def predict(file: UploadFile = File(...)):
             visual["disease"],
             visual["probability"],
             visual["positive"],
+            visual["all_probs"],
+            visual["original_base64"],
+            visual["heatmap_base64"],
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Report generation failed: {e}")
