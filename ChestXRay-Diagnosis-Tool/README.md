@@ -35,8 +35,8 @@ An AI-powered multi-stage diagnostic assistant for radiologists. The system inge
         ▼
 ┌───────────────────┐
 │   FRONTEND        │  ← React + Vite
-│   Web UI          │    Upload → Heatmap → Findings → Editable Report
-│   Status: ✅ Done │
+│   Web UI & Chat   │    Upload → Heatmap → Findings → Editable Report
+│   Status: ✅ Done │    Resizable Chat Panel (Dr. Chakshu assistant)
 └───────────────────┘
 ```
 
@@ -102,6 +102,7 @@ An AI-powered multi-stage diagnostic assistant for radiologists. The system inge
 |---|---|---|
 | `GET` | `/health` | Returns device info and disease list |
 | `POST` | `/predict` | Upload PNG/JPEG → returns classification + heatmap + report |
+| `POST` | `/chat` | Conversational endpoint for the ReAct agent |
 
 **Files:** `backend/main.py`, `backend/inference.py`, `backend/model.py`, `backend/config.py`
 
@@ -155,6 +156,23 @@ An AI-powered multi-stage diagnostic assistant for radiologists. The system inge
 
 ---
 
+## Module D — Chat Assistant (Dr. Chakshu) ✅
+
+**Goal:** Provide an interactive conversational agent that can answer user queries about their diagnostic report, query medical databases, and search clinical guidelines.
+
+**Architecture — LangGraph ReAct Agent:**
+- **LLM:** Qwen (e.g. `qwen-2.5-32b`) via Groq for high-speed tool calling.
+- **Tools:**
+  - `search_xray_dictionary`: Queries the local FAISS medical dictionary.
+  - `search_cardiomegaly_db` / `search_pleuraleffusion_pneumothorax_db`: Queries disease-specific FAISS indexes.
+  - `clinical_web_search`: Uses Tavily API for live clinical guidelines search.
+- **Context Injection:** The user's most recent diagnostic report is dynamically injected into the active message payload as a hidden system context, ensuring the LLM is fully aware of the patient's findings.
+- **Frontend Integration:** The UI displays a resizable side panel that renders the agent's thought process (reasoning and tool execution) transparently to the user, similar to modern AI assistant UIs.
+
+**Files:** `backend/chat_agent.py`, `backend/chat_router.py`, `backend/tools.py`
+
+---
+
 ## Frontend — Web UI ✅
 
 **Goal:** A clean, professional interface for radiologists to upload X-rays and view results.
@@ -167,6 +185,7 @@ An AI-powered multi-stage diagnostic assistant for radiologists. The system inge
 - Side-by-side comparison: Original Radiograph | Grad-CAM Saliency Map
 - **Diagnostic Findings card** — confidence bar per disease, Present/Absent pill badge
 - **Clinical Report card** — formatted report with Copy-to-clipboard and `.txt` download
+- **Interactive Chat Assistant** — Dr. Chakshu panel with drag-to-resize handle, markdown support, and an expandable "Thought process" UI showing the AI's internal reasoning.
 - Error banner with descriptive API error messages
 - Fully accessible (ARIA roles, keyboard navigation, live regions)
 
@@ -195,6 +214,9 @@ ChestXRay-Diagnosis-Tool/
 │   ├── model.py                                   # PyTorch DenseNet-121 loader
 │   ├── config.py                                  # Shared configuration
 │   ├── report_graph.py                            # LangGraph Scribe→Auditor RAG pipeline
+│   ├── chat_agent.py                              # LangGraph ReAct conversational agent
+│   ├── chat_router.py                             # FastAPI router for /chat endpoint
+│   ├── tools.py                                   # Tool definitions for the ReAct agent
 │   ├── faiss_db/                                  # FAISS vector store indexes
 │   ├── models/
 │   │   └── best_model.pth                         # Trained weights
@@ -206,10 +228,14 @@ ChestXRay-Diagnosis-Tool/
 │   │   ├── main.jsx                               # React entry point
 │   │   ├── index.css                              # Design system & styles
 │   │   ├── icons.jsx                              # SVG icon components
-│   │   └── components/
-│   │       ├── UploadZone.jsx
-│   │       ├── FindingsCard.jsx
-│   │       └── ReportCard.jsx
+│   │   ├── components/
+│   │   │   ├── UploadZone.jsx
+│   │   │   ├── FindingsCard.jsx
+│   │   │   ├── ReportCard.jsx
+│   │   │   └── ChatPanel/                         # Chatbot UI with resizable logic
+│   │   └── api/
+│   │       ├── predict.js
+│   │       └── chat.js
 │   ├── index.html
 │   ├── vite.config.js
 │   └── package.json
@@ -240,6 +266,8 @@ Create a `.env` file in `backend/`:
 ```env
 GEMINI_API_KEY=your_google_gemini_api_key
 HF_TOKEN=your_huggingface_token
+GROQ_API_KEY=your_groq_api_key
+TAVILY_API_KEY=your_tavily_api_key
 ```
 
 Start the API server:

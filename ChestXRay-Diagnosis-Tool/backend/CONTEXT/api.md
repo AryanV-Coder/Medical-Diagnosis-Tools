@@ -8,9 +8,10 @@
 ## What this feature does
 
 FastAPI application that serves as the single entry point for all client requests.
-Loads the ML model at startup (once), and exposes two endpoints:
+Loads the ML model at startup (once), and exposes three endpoints:
 - `GET /health` — liveness check
 - `POST /predict` — full pipeline: inference + Grad-CAM + agentic report generation
+- `POST /chat` — interactive conversational endpoint (Dr. Chakshu) powered by LangGraph ReAct agent
 
 ---
 
@@ -110,13 +111,51 @@ would block the event loop — it makes multiple LLM calls.
 
 ---
 
+### `POST /chat`
+```python
+@chat_router.post("/chat")
+async def chat_endpoint(req: ChatRequest) -> dict:
+```
+**Accepted JSON payload:**
+```json
+{
+  "message": "tell me about my report",
+  "session_id": "optional-uuid",
+  "report_context": "optional raw report text to inject as context"
+}
+```
+
+**Step 1 — Agentic Chat execution:**
+```python
+result = await asyncio.to_thread(
+    chat_agent,
+    req.message,
+    session_id,
+    req.report_context
+)
+```
+
+**Context Injection:** If `report_context` is provided (usually on the first turn of a new report), it is forcibly appended to the bottom of the user's message as a `[SYSTEM CONTEXT]` block. This circumvents context-window attention issues common in LLaMA/Qwen architectures, ensuring the agent sees the report without the user needing to ask.
+
+**Response shape (HTTP 200):**
+```python
+{
+    "answer": str,             # the LLM's natural language reply
+    "session_id": str,         # uuid for continuing the thread
+    "intermediate_steps": list # list of {"type": "thought"|"action", "output": str, "tool": str, "input": dict}
+}
+```
+
+---
+
 ## Imports (what main.py depends on)
 
 ```python
-from model import load_model          # model.py
+from model import load_model             # model.py
 from inference import run_full_pipeline  # inference.py
 from report_graph import generate_report # report_graph.py
 from config import DEVICE, DISEASES      # config.py
+from chat_router import chat_router      # chat_router.py (mounted via app.include_router)
 ```
 
 ---

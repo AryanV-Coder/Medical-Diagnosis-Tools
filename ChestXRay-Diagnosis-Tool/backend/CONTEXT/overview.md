@@ -15,6 +15,8 @@ structured clinical radiology report. The final JSON response contains the disea
 probability, positive flag, heatmap image (base64), and a structured report split into
 editable sections ready for a frontend editor.
 
+Finally, an interactive ReAct chat agent (Dr. Chakshu) allows the user to converse with an LLM about their specific diagnostic report, powered by Groq and tool-calling capabilities.
+
 ---
 
 ## Module map
@@ -34,6 +36,17 @@ editable sections ready for a frontend editor.
        │ report dict
        ▼
  JSON response to caller
+
+
+[POST /chat]     ← chat_router.py (FastAPI router included in main.py)
+       │
+       ▼
+ chat_agent.py           → tools.py + faiss_db/ + Groq API
+ ReAct Agent loop          LangGraph with tool binding
+       │
+       │ streaming intermediate steps + final response
+       ▼
+ JSON response to caller
 ```
 
 ---
@@ -46,6 +59,8 @@ editable sections ready for a frontend editor.
 | `model.py` | Build + load the DenseNet-121 | When changing model architecture or checkpoint loading |
 | `inference.py` | Image preprocessing, prediction, Grad-CAM | When changing inference logic, output format, or preprocessing |
 | `report_graph.py` | LangGraph agentic report graph (Scribe + Auditor) + RAG retrieval | When changing report format, LLM, prompts, or graph structure |
+| `chat_agent.py` | LangGraph ReAct agent for conversational chat | When changing chat LLM (Groq), prompts, or tool execution logic |
+| `chat_router.py`| FastAPI router for `/chat` endpoint | When modifying chat request/response payload structures |
 | `main.py` | FastAPI app, lifespan, `/predict` endpoint | When adding endpoints or changing the API response shape |
 
 ---
@@ -97,6 +112,8 @@ editable sections ready for a frontend editor.
 |---|---|---|
 | `GEMINI_API_KEY` | `report_graph.py` | Google Gemini API key |
 | `HF_TOKEN` | `report_graph.py` | HuggingFace token for embedding endpoint |
+| `GROQ_API_KEY` | `chat_agent.py` | Groq API key for Qwen/Llama chat LLM |
+| `TAVILY_API_KEY` | `tools.py` | Tavily API key for live clinical search |
 
 ---
 
@@ -116,5 +133,6 @@ editable sections ready for a frontend editor.
 | Classification (DenseNet-121) | ✅ Done — AUC 0.7735 |
 | Grad-CAM + FastAPI | ✅ Done |
 | RAG FAISS knowledge base | ✅ Done — 4 indexes built |
-| LangGraph agentic report (Scribe + Auditor) | ✅ Initiated |
-| Frontend UI | ⬜ Not started |
+| LangGraph agentic report (Scribe + Auditor) | ✅ Done |
+| LangGraph chat assistant (Dr. Chakshu) | ✅ Done |
+| Frontend UI (React/Vite) | ✅ Done |
