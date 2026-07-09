@@ -1,6 +1,6 @@
 # ChestXRay Diagnosis Tool
 
-An AI-powered multi-stage diagnostic assistant for radiologists. The system ingests a patient's Chest X-ray, classifies it for three target diseases, generates a visual Grad-CAM saliency heatmap explaining the model's focus, and drafts a structured clinical report through a two-agent LangGraph RAG pipeline.
+An AI-powered multi-stage diagnostic assistant designed for both doctors and patients. The system ingests a Chest X-ray, classifies it for three target diseases, generates a visual Grad-CAM saliency heatmap explaining the model's focus, and drafts a structured clinical report through a two-agent LangGraph RAG pipeline. Additionally, the integrated AI chat system is specifically built to help patients understand their health by simplifying complex medical terms, ensuring that the diagnostic results are clear and accessible to everyone.
 
 > ⚠️ **Disclaimer:** This tool is intended for research and educational purposes only. It is **not** a certified medical device. All AI-generated reports must be reviewed and validated by a licensed radiologist before any clinical use.
 
@@ -302,3 +302,13 @@ The app will be available at `http://localhost:5173`.
 | `pypdf` / `langchain-text-splitters` | PDF ingestion for RAG |
 
 **Training environment:** Google Colab (T4 GPU recommended)
+
+---
+
+## 🇮🇳 Project Vision
+
+This project is built with the aim to contribute to the medical sector of India. By leveraging advanced AI technologies, we hope to provide accessible, rapid, and accurate diagnostic support to patients, radiologists, and healthcare professionals, particularly in resource-constrained environments across the country.
+
+---
+
+**Author:** Aryan Varshney
