@@ -6,6 +6,12 @@ An AI-powered multi-stage diagnostic assistant designed for both doctors and pat
 
 ---
 
+## 🇮🇳 Project Vision
+
+This project was built with a clear mission: to advance the medical sector in India by democratizing access to high-quality healthcare. By leveraging cutting-edge AI technologies, we aim to deliver accessible, rapid, and highly accurate diagnostic support. Our goal is to empower patients with understandable health insights while assisting radiologists and healthcare professionals in making critical decisions—especially in resource-constrained and rural environments across the country where expert care is needed most.
+
+---
+
 ## Pipeline Overview
 
 ```
@@ -302,12 +308,6 @@ The app will be available at `http://localhost:5173`.
 | `pypdf` / `langchain-text-splitters` | PDF ingestion for RAG |
 
 **Training environment:** Google Colab (T4 GPU recommended)
-
----
-
-## 🇮🇳 Project Vision
-
-This project is built with the aim to contribute to the medical sector of India. By leveraging advanced AI technologies, we hope to provide accessible, rapid, and accurate diagnostic support to patients, radiologists, and healthcare professionals, particularly in resource-constrained environments across the country.
 
 ---
 
