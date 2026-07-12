@@ -4,6 +4,8 @@ An AI-powered multi-stage diagnostic assistant designed for both doctors and pat
 
 > ⚠️ **Disclaimer:** This tool is intended for research and educational purposes only. It is **not** a certified medical device. All AI-generated reports must be reviewed and validated by a licensed radiologist before any clinical use.
 
+🎥 **[Watch the Demo Video](https://drive.google.com/file/d/1X7yuYM2ie2FDbV43EE0FeBHUg_kFFqE9/view)**
+
 ---
 
 ## 🇮🇳 Project Vision
