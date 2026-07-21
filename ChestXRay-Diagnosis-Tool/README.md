@@ -173,7 +173,7 @@ This project was built with a clear mission: to advance the medical sector in In
 - **Tools:**
   - `search_xray_dictionary`: Queries the local FAISS medical dictionary.
   - `search_cardiomegaly_db` / `search_pleuraleffusion_pneumothorax_db`: Queries disease-specific FAISS indexes.
-  - `clinical_web_search`: Uses Tavily API for live clinical guidelines search.
+  - `clinical_web_search`: Uses DuckDuckGo Search (`ddgs`) for live clinical guidelines search (NIH, CDC, WHO).
 - **Context Injection:** The user's most recent diagnostic report is dynamically injected into the active message payload as a hidden system context, ensuring the LLM is fully aware of the patient's findings.
 - **Frontend Integration:** The UI displays a resizable side panel that renders the agent's thought process (reasoning and tool execution) transparently to the user, similar to modern AI assistant UIs.
 
@@ -275,7 +275,6 @@ Create a `.env` file in `backend/`:
 GEMINI_API_KEY=your_google_gemini_api_key
 HF_TOKEN=your_huggingface_token
 GROQ_API_KEY=your_groq_api_key
-TAVILY_API_KEY=your_tavily_api_key
 ```
 
 Start the API server:

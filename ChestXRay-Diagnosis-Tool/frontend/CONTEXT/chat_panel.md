@@ -12,7 +12,7 @@
 ## Architecture & State
 
 ### State Variables
-- `messages`: Array of message objects `{ role: "user"|"assistant", text: string, dbsQueried?: string[], sources?: string[] }`.
+- `messages`: Array of message objects `{ role: "user"|"assistant", text: string, intermediateSteps?: array }`.
 - `input`: The current value of the textarea.
 - `loading`: Boolean blocking input while waiting for the LLM.
 - `chatError`: Displays API/network errors inline.
@@ -39,9 +39,10 @@ The LLM requires the `report_context` (the full markdown report) to ground its a
    - Assistant messages are rendered using `marked.parse(msg.text)` and injected via `dangerouslySetInnerHTML`.
    - `marked` is configured with `{ breaks: true, gfm: true }`.
 
-2. **Metadata Chips**:
-   - The backend LangGraph agent returns arrays of `dbsQueried` (FAISS indexes) and `sources` (Tavily URLs).
-   - If present, `ChatPanel` maps these into visual "chips" below the assistant's message bubble, giving the user transparency into where the AI pulled its medical guidelines from.
+2. **Thought Process UI (Intermediate Steps)**:
+   - The backend LangGraph agent streams `intermediate_steps` which contains the agent's internal reasoning (`type: "thought"`) and tool executions (`type: "action"`).
+   - If present, `ChatPanel` renders an expandable accordion ("Thought process") above the assistant's message bubble.
+   - It formats tool executions into clean, human-readable strings (e.g., "Searching internal knowledge base...") and hides raw JSON payloads, delivering a ChatGPT-like UX.
 
 3. **Auto-Scrolling**:
    - A `messagesEndRef` is placed at the bottom of the message list.

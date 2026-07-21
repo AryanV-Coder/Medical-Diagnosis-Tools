@@ -113,7 +113,6 @@ Finally, an interactive ReAct chat agent (Dr. Chakshu) allows the user to conver
 | `GEMINI_API_KEY` | `report_graph.py` | Google Gemini API key |
 | `HF_TOKEN` | `report_graph.py` | HuggingFace token for embedding endpoint |
 | `GROQ_API_KEY` | `chat_agent.py` | Groq API key for Qwen/Llama chat LLM |
-| `TAVILY_API_KEY` | `tools.py` | Tavily API key for live clinical search |
 
 ---
 

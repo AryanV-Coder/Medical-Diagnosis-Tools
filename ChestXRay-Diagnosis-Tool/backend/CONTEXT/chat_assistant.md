@@ -36,7 +36,7 @@ The agent has access to specific tools to augment its knowledge:
 1. `search_xray_dictionary`: Uses FAISS to query general X-ray terms.
 2. `search_cardiomegaly_db`: Uses FAISS to query cardiomegaly guidelines.
 3. `search_pleuraleffusion_pneumothorax_db`: Uses FAISS to query lung fluid/collapse guidelines.
-4. `clinical_web_search`: Uses the `TavilySearchResults` tool to hit the live internet for recent clinical guidelines (e.g., "AHA guidelines 2024").
+4. `clinical_web_search`: Uses the `ddgs` (DuckDuckGo Search) package to hit the live internet for recent clinical guidelines (e.g., "AHA guidelines 2024"). It restricts queries to trusted domains (nih.gov, cdc.gov, who.int).
 
 *To add a new tool:*
 1. Write a function with a detailed Google-style docstring (the LLM reads this to know when to use it).
