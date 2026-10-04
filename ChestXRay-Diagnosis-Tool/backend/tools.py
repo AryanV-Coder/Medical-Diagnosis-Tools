@@ -2,7 +2,7 @@ import os
 from langchain_core.tools import tool
 from langchain_community.vectorstores import FAISS
 from langchain_huggingface import HuggingFaceEndpointEmbeddings
-from ddgs import DDGS
+from duckduckgo_search import DDGS
 from dotenv import load_dotenv
 
 load_dotenv()

@@ -20,4 +20,4 @@ langgraph
 faiss-cpu
 langchain_huggingface
 huggingface_hub
-ddgs
+duckduckgo-search
