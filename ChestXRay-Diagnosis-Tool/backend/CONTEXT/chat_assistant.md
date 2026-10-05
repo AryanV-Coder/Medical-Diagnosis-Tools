@@ -16,7 +16,7 @@ This file builds the LangGraph ReAct agent.
 
 ### LLM Setup
 - Uses `ChatGroq` for high-speed inference.
-- Defaults to a model like `qwen-2.5-32b` or `llama-3.3-70b-versatile`.
+- Defaults to `qwen/qwen3.8-27b`.
 - **Note:** Depending on the model, `parallel_tool_calls` may be enabled or disabled based on provider support.
 
 ### The Context Injection Hack

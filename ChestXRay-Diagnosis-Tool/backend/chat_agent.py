@@ -18,7 +18,7 @@ load_dotenv()
 # Using Qwen 3 32B on Groq — it has reliable native tool calling support,
 # unlike llama-3.3-70b-versatile which generates broken tool call formats.
 llm = ChatGroq(
-    model="qwen/qwen3-32b",
+    model="qwen/qwen3.8-27b",
     api_key=os.getenv("GROQ_API_KEY"),
     temperature=0.2,
 )
