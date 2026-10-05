@@ -1,3 +1,4 @@
+import threading
 from contextlib import asynccontextmanager
 import asyncio
 
@@ -10,14 +11,23 @@ from report_graph import generate_report
 from chat_router import router as chat_router
 from config import DEVICE, DISEASES
 
-model = None
+_model_lock = threading.Lock()
+_model = None
+
+def get_model():
+    global _model
+    if _model is None:
+        with _model_lock:
+            if _model is None:
+                _model = load_model()
+    return _model
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global model
-    model = load_model()
+    # App starts up instantly so Render/cloud platforms bind to port immediately
     yield
-    model = None
+    global _model
+    _model = None
 
 app = FastAPI(title="Dr. Chakshu API", version="2.0.0", lifespan=lifespan)
 
@@ -40,7 +50,8 @@ async def predict(file: UploadFile = File(...)):
 
     # Step 1 — ML inference + Grad-CAM
     try:
-        visual = run_full_pipeline(model, raw_bytes)
+        model_instance = get_model()
+        visual = run_full_pipeline(model_instance, raw_bytes)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Inference failed: {e}")
 

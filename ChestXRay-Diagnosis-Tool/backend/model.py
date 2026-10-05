@@ -31,11 +31,12 @@ def load_model():
             "Download best_model.pth from Google Drive and place it in backend/models/"
         )
 
-    net = build_model()
-    checkpoint = torch.load(MODEL_PATH, map_location=DEVICE, weights_only=False)
-    net.load_state_dict(checkpoint["model_state_dict"])
-    net = net.to(DEVICE)
-    net.eval()
+    with torch.inference_mode():
+        net = build_model()
+        checkpoint = torch.load(MODEL_PATH, map_location=DEVICE, weights_only=False)
+        net.load_state_dict(checkpoint["model_state_dict"])
+        net = net.to(DEVICE)
+        net.eval()
 
     print(f"Model loaded — epoch {checkpoint.get('epoch')} | val_loss {checkpoint.get('val_loss', 0):.4f}")
     return net

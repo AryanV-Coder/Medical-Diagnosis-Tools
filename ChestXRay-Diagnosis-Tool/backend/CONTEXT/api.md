@@ -30,20 +30,28 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], all
 
 ---
 
-## Model loading — `lifespan` context manager
+## Model loading — Lazy Loading & Memory Optimization
 
 ```python
-model = None  # module-level global
+_model = None
+
+def get_model():
+    global _model
+    if _model is None:
+        with _model_lock:
+            if _model is None:
+                _model = load_model()
+    return _model
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global model
-    model = load_model()   # blocks until model is on device
+    # App boots instantly (<0.2s) allowing cloud platform port scanners to pass immediately
     yield
-    model = None           # cleanup on shutdown
+    global _model
+    _model = None
 ```
-- `load_model()` is called ONCE at startup — it is NOT thread-safe to call it per-request.
-- The global `model` variable is read inside `predict()` — do NOT shadow or reassign it.
+- `get_model()` lazy-loads the model on first request in a thread-safe manner.
+- Startup is instant, preventing deployment port scan timeouts and reducing initial RAM footprint.
 
 ---
 
