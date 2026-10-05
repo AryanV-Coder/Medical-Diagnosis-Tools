@@ -3,7 +3,7 @@
 import torch
 import torch.nn as nn
 from torchvision import models
-from config import MODEL_PATH, DEVICE, DISEASES
+from config import MODEL_PATH, get_device, DISEASES
 
 
 def build_model():
@@ -31,12 +31,11 @@ def load_model():
             "Download best_model.pth from Google Drive and place it in backend/models/"
         )
 
-    with torch.inference_mode():
-        net = build_model()
-        checkpoint = torch.load(MODEL_PATH, map_location=DEVICE, weights_only=False)
-        net.load_state_dict(checkpoint["model_state_dict"])
-        net = net.to(DEVICE)
-        net.eval()
+    net = build_model()
+    checkpoint = torch.load(MODEL_PATH, map_location=get_device(), weights_only=False)
+    net.load_state_dict(checkpoint["model_state_dict"])
+    net = net.to(get_device())
+    net.eval()
 
     print(f"Model loaded — epoch {checkpoint.get('epoch')} | val_loss {checkpoint.get('val_loss', 0):.4f}")
     return net
