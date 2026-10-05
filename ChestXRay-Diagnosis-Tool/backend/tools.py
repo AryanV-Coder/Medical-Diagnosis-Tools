@@ -1,18 +1,32 @@
 import os
 from langchain_core.tools import tool
 from langchain_community.vectorstores import FAISS
-from langchain_huggingface import HuggingFaceEndpointEmbeddings
-from duckduckgo_search import DDGS
 from dotenv import load_dotenv
 
 load_dotenv()
 
 FAISS_DB_DIR = os.path.join(os.path.dirname(__file__), "faiss_db")
 
-embeddings = HuggingFaceEndpointEmbeddings(
-    model="sentence-transformers/all-MiniLM-L6-v2",
-    huggingfacehub_api_token=os.getenv("HF_TOKEN"),
-)
+# Lazy singletons — initialized on first use, not at import time
+_embeddings = None
+_ddgs_client = None
+
+def _get_embeddings():
+    global _embeddings
+    if _embeddings is None:
+        from langchain_huggingface import HuggingFaceEndpointEmbeddings
+        _embeddings = HuggingFaceEndpointEmbeddings(
+            model="sentence-transformers/all-MiniLM-L6-v2",
+            huggingfacehub_api_token=os.getenv("HF_TOKEN"),
+        )
+    return _embeddings
+
+def _get_ddgs():
+    global _ddgs_client
+    if _ddgs_client is None:
+        from duckduckgo_search import DDGS
+        _ddgs_client = DDGS()
+    return _ddgs_client
 
 # Helper to retrieve from a specific FAISS index
 def _retrieve_from_db(db_name: str, query: str, k: int = 3) -> str:
@@ -22,7 +36,7 @@ def _retrieve_from_db(db_name: str, query: str, k: int = 3) -> str:
     
     index = FAISS.load_local(
         db_path,
-        embeddings,
+        _get_embeddings(),
         allow_dangerous_deserialization=True,
     )
     docs = index.similarity_search(query, k=k)
@@ -62,9 +76,6 @@ def search_xray_dictionary(query: str) -> str:
     """
     return _retrieve_from_db("xraydictionary", query)
 
-# Web Search Tool using the native DDGS client directly to avoid LangChain import errors
-_ddgs_client = DDGS()
-
 @tool
 def clinical_web_search(query: str) -> str:
     """
@@ -76,7 +87,7 @@ def clinical_web_search(query: str) -> str:
     restricted_query = f"{query} {trusted_domains}"
     
     try:
-        results = _ddgs_client.text(restricted_query, max_results=3)
+        results = _get_ddgs().text(restricted_query, max_results=3)
         if not results:
             return "No reliable medical information found on the web."
         

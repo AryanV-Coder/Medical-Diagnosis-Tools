@@ -16,6 +16,7 @@ from langgraph.graph import StateGraph, END
 
 load_dotenv()
 
+
 def _resize_base64(b64_str: str, max_dim: int = 512) -> str:
     if not b64_str:
         return b64_str
@@ -31,6 +32,7 @@ def _resize_base64(b64_str: str, max_dim: int = 512) -> str:
     except Exception:
         return b64_str
 
+
 FAISS_DB_DIR = os.path.join(os.path.dirname(__file__), "faiss_db")
 
 RETRIEVAL_MAP = {
@@ -39,27 +41,59 @@ RETRIEVAL_MAP = {
     "Pneumothorax": ["pleuraleffusion_pneumothorax", "xraydictionary"],
 }
 
-embeddings = HuggingFaceEndpointEmbeddings(
-    model="sentence-transformers/all-MiniLM-L6-v2",
-    huggingfacehub_api_token=os.getenv("HF_TOKEN"),
-)
-
-# Vision model for the Scribe — sees both images
-vision_llm = ChatGroq(
-    model="qwen/qwen3.8-27b",
-    api_key=os.getenv("GROQ_API_KEY"),
-    temperature=0.3,
-)
-
-# Text-only model for the Auditor — just checks the text draft
-llm = ChatGroq(
-    model="qwen/qwen3.8-27b",
-    api_key=os.getenv("GROQ_API_KEY"),
-    temperature=0.3,
-)
+# ---- Lazy singletons — nothing runs at import time ---------------------------
+_embeddings   = None
+_vision_llm   = None
+_llm          = None
+_report_graph = None
 
 
-# ── State ──────────────────────────────────────────────────────────────────────
+def _get_embeddings():
+    global _embeddings
+    if _embeddings is None:
+        _embeddings = HuggingFaceEndpointEmbeddings(
+            model="sentence-transformers/all-MiniLM-L6-v2",
+            huggingfacehub_api_token=os.getenv("HF_TOKEN"),
+        )
+    return _embeddings
+
+
+def _get_vision_llm():
+    global _vision_llm
+    if _vision_llm is None:
+        _vision_llm = ChatGroq(
+            model="qwen/qwen3.8-27b",
+            api_key=os.getenv("GROQ_API_KEY"),
+            temperature=0.3,
+        )
+    return _vision_llm
+
+
+def _get_llm():
+    global _llm
+    if _llm is None:
+        _llm = ChatGroq(
+            model="qwen/qwen3.8-27b",
+            api_key=os.getenv("GROQ_API_KEY"),
+            temperature=0.3,
+        )
+    return _llm
+
+
+def _get_graph():
+    global _report_graph
+    if _report_graph is None:
+        graph = StateGraph(ReportState)
+        graph.add_node("scribe",  scribe)
+        graph.add_node("auditor", auditor)
+        graph.set_entry_point("scribe")
+        graph.add_edge("scribe", "auditor")
+        graph.add_conditional_edges("auditor", route_after_auditor)
+        _report_graph = graph.compile()
+    return _report_graph
+
+
+# ---- State -------------------------------------------------------------------
 class ReportState(TypedDict):
     disease:         str
     probability:     float
@@ -75,13 +109,13 @@ class ReportState(TypedDict):
     iterations:      int
 
 
-# ── Helpers ────────────────────────────────────────────────────────────────────
+# ---- Helpers -----------------------------------------------------------------
 def fetch_context(disease: str) -> str:
     chunks = []
     for name in RETRIEVAL_MAP.get(disease, ["xraydictionary"]):
         index = FAISS.load_local(
             os.path.join(FAISS_DB_DIR, name),
-            embeddings,
+            _get_embeddings(),
             allow_dangerous_deserialization=True,
         )
         docs = index.similarity_search(f"{disease} chest xray diagnosis management", k=3)
@@ -100,7 +134,7 @@ def _confidence_table(all_probs: dict) -> str:
 def parse_sections(report: str, state: ReportState) -> dict:
     """Split the flat report text into named sections for the frontend editor."""
 
-    # ── Invalid image case ────────────────────────────────────────────────────
+    # -- Invalid image case ----------------------------------------------------
     if "## INVALID IMAGE" in report.upper():
         m = re.search(r"##\s*INVALID IMAGE\s*\n(.*)", report, re.DOTALL | re.IGNORECASE)
         body = m.group(1).strip() if m else "The uploaded image is not a valid chest X-ray."
@@ -113,7 +147,7 @@ def parse_sections(report: str, state: ReportState) -> dict:
             }
         }
 
-    # ── Normal report case ────────────────────────────────────────────────────
+    # -- Normal report case ----------------------------------------------------
     def extract(header):
         m = re.search(
             rf"##\s*{re.escape(header)}\s*\n(.*?)(?=\n##\s|\Z)",
@@ -176,7 +210,7 @@ def parse_sections(report: str, state: ReportState) -> dict:
     }
 
 
-# ── Node 1: Scribe ─────────────────────────────────────────────────────────────
+# ---- Node 1: Scribe ----------------------------------------------------------
 def scribe(state: ReportState) -> ReportState:
     """Write (or rewrite) the report. Sends both images to the vision model."""
 
@@ -189,58 +223,51 @@ You are provided with two images:
 - Image 1: The UPLOADED IMAGE (check whether this is a chest X-ray)
 - Image 2: The Focused Heatmap from an AI model
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-STEP 1 — IMAGE VALIDATION
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 1 - IMAGE VALIDATION
 Look at Image 1. Is it a chest X-ray (a radiograph showing the thorax, ribcage, lungs, and heart)?
 
-If NO — output ONLY this and nothing else:
+If NO - output ONLY this and nothing else:
 
 ## INVALID IMAGE
 The uploaded image does not appear to be a chest X-ray. A valid PA or AP chest radiograph of the thorax is required for AI-assisted analysis. Please re-upload a correct chest X-ray image.
 
 Do NOT produce any other sections. Stop here.
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-STEP 2 — WRITE THE REPORT (only if Image 1 IS a chest X-ray)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 2 - WRITE THE REPORT (only if Image 1 IS a chest X-ray)
 
-⚠️ CRITICAL SAFETY RULES — YOU MUST FOLLOW THESE STRICTLY:
+CRITICAL SAFETY RULES:
 1. You are NOT performing independent radiology. Do NOT diagnose anything by looking at the images yourself.
 2. The ONLY confirmed finding is what the AI model detected: **{state['disease']}** at **{state['probability'] * 100:.1f}% confidence**.
 3. Use Image 2 (Focused Heatmap) ONLY to describe the specific anatomical region highlighted (e.g. "cardiac silhouette", "left lower lung zone"). Do NOT use it to make a new diagnosis.
-4. Write about ONLY **{state['disease']}**. Do NOT mention any other disease by name — not even to say it was not found.
+4. Write about ONLY **{state['disease']}**. Do NOT mention any other disease by name.
 5. For areas NOT related to **{state['disease']}**, write "No acute abnormality detected by the AI model".
 6. Do NOT use phrases like "I observe", "I notice", or "appears to show".
 
 Primary AI-detected finding: **{state['disease']}** at **{state['probability'] * 100:.1f}%**
 
-Relevant medical guideline extracts (use ONLY these for recommendations — do not invent clinical steps):
+Relevant medical guideline extracts (use ONLY these for recommendations):
 {context}
 
 ---
 
 Write ONLY the following four sections using these EXACT headers (## prefix).
-Format: **bold** for key terms, bullet points for lists, no extra headings inside sections.
 
 ## FINDINGS
 
-- **Lungs and Pleura:** [Write here ONLY if {state['disease']} is Effusion or Pneumothorax. Use Image 2 to state which specific lung region is highlighted. For any other disease write: No acute abnormality detected by the AI model.]
-- **Heart and Mediastinum:** [Write here ONLY if {state['disease']} is Cardiomegaly. Use Image 2 to state which specific cardiac region is highlighted. For any other disease write: No acute abnormality detected by the AI model.]
+- **Lungs and Pleura:** [Write here ONLY if {state['disease']} is Effusion or Pneumothorax. Otherwise: No acute abnormality detected by the AI model.]
+- **Heart and Mediastinum:** [Write here ONLY if {state['disease']} is Cardiomegaly. Otherwise: No acute abnormality detected by the AI model.]
 - **Bones and Soft Tissues:** No acute abnormality detected by the AI model.
 - **Hardware/Lines/Tubes:** None identified.
-- **Localization:** The Focused Heatmap (Image 2) highlights the [fill in the specific anatomical region you see highlighted in Image 2, e.g. "cardiac silhouette" or "right lower lung zone"] as the region most associated with the AI model's detection of **{state['disease']}**.
+- **Localization:** The Focused Heatmap (Image 2) highlights the [specific anatomical region] as the region most associated with the AI model's detection of **{state['disease']}**.
 
 ## IMPRESSION
 
-- **{state['disease']}** detected by the AI model at **{state['probability'] * 100:.1f}% confidence**. [Add one sentence on its clinical significance based on the provided guideline extracts.]
+- **{state['disease']}** detected by the AI model at **{state['probability'] * 100:.1f}% confidence**. [Add one sentence on clinical significance.]
 
 ## RAG CLINICAL RECOMMENDATIONS
 
-Use ONLY the guideline extracts above. Do not invent any step not present in those extracts.
-
-- **Suggested Action:** [One specific evidence-based next step from the provided guideline extracts for **{state['disease']}**.]
-- **Regional Protocol Flag:** [If {state['disease']} is Effusion: flag MoHFW/NTEP TB screening. For all other diseases: state the relevant regional standard from the provided guideline extracts.]
+- **Suggested Action:** [One evidence-based next step from the guideline extracts.]
+- **Regional Protocol Flag:** [If {state['disease']} is Effusion: flag MoHFW/NTEP TB screening. Otherwise: state the relevant regional standard.]
 
 ## MANDATORY AI SAFETY DISCLAIMER
 **ALERT:** This report was generated by an artificial intelligence triage assistant. The findings and suggested recommendations are for investigational and prioritization purposes only. This document does not constitute a final medical diagnosis and **must be independently verified by a licensed, board-certified physician before initiating any patient care**.
@@ -249,34 +276,31 @@ Use ONLY the guideline extracts above. Do not invent any step not present in tho
         orig_b64 = _resize_base64(state['original_base64'])
         heat_b64 = _resize_base64(state['heatmap_base64'])
 
-        # Build multimodal message: text + original image + heatmap
         message = HumanMessage(content=[
             {"type": "text", "text": text_prompt},
             {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{orig_b64}"}},
             {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{heat_b64}"}},
         ])
-        draft = vision_llm.invoke([message]).content
+        draft = _get_vision_llm().invoke([message]).content
 
     else:
         context = state["context"]
         orig_b64 = _resize_base64(state['original_base64'])
         heat_b64 = _resize_base64(state['heatmap_base64'])
 
-        # Revision also uses the vision model with images —
-        # some auditor checks (e.g. Localization too generic) require seeing Image 2 to fix properly
         revision_prompt = f"""You are a senior radiologist revising a chest X-ray report.
 
 You are provided with the same two images as before:
 - Image 1: The ORIGINAL chest X-ray
 - Image 2: The Focused Heatmap (shows WHERE the AI model is focusing)
 
-⚠️ SAFETY RULES (same as the original draft — do not violate these during revision):
-1. Do NOT add any new diagnosis or finding beyond what the AI model already detected: **{state['disease']}** at **{state['probability'] * 100:.1f}%**.
-2. Do NOT invent clinical recommendations not present in the original draft's guideline extracts.
+SAFETY RULES:
+1. Do NOT add any new diagnosis beyond what the AI model detected: **{state['disease']}** at **{state['probability'] * 100:.1f}%**.
+2. Do NOT invent clinical recommendations not in the original draft.
 3. Do NOT use phrases like "I observe" or "appears to show".
-4. For all unflagged areas, keep the "No acute abnormality detected by the AI model" phrasing.
+4. Keep "No acute abnormality detected by the AI model" for unflagged areas.
 
-The auditor flagged these specific issues with your previous draft:
+The auditor flagged these specific issues:
 {state['feedback']}
 
 Your previous draft:
@@ -285,28 +309,26 @@ Your previous draft:
 Fix ONLY the flagged issues. Keep all other content exactly as is.
 Preserve all Markdown formatting (**bold**, bullet points).
 Keep the same four section headers: ## FINDINGS, ## IMPRESSION, ## RAG CLINICAL RECOMMENDATIONS, ## MANDATORY AI SAFETY DISCLAIMER.
-Output ONLY the corrected report text — no preamble, no commentary.
+Output ONLY the corrected report text.
 """
         message = HumanMessage(content=[
             {"type": "text", "text": revision_prompt},
             {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{orig_b64}"}},
             {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{heat_b64}"}},
         ])
-        draft = vision_llm.invoke([message]).content
+        draft = _get_vision_llm().invoke([message]).content
 
     return {**state, "context": context, "draft": draft, "feedback": "", "iterations": state["iterations"] + 1}
 
 
-# ── Node 2: Auditor ────────────────────────────────────────────────────────────
+# ---- Node 2: Auditor ---------------------------------------------------------
 def auditor(state: ReportState) -> ReportState:
     """Check the draft. Return PASS or FAIL+feedback."""
 
-    # ── Fast-pass for invalid image reports ───────────────────────────────────
     if "## INVALID IMAGE" in state["draft"].upper():
         sections = parse_sections(state["draft"], state)
         return {**state, "final": state["draft"], "sections": sections, "feedback": ""}
 
-    # ── Normal checklist ──────────────────────────────────────────────────────
     prompt = f"""You are a medical safety auditor reviewing an AI-generated chest X-ray report.
 
 The ONLY confirmed disease for this report is: **{state['disease']}**.
@@ -314,12 +336,12 @@ The ONLY confirmed disease for this report is: **{state['disease']}**.
 Check the draft against ALL of the following:
 1. Does it have a ## MANDATORY AI SAFETY DISCLAIMER section containing the word "physician"?
 2. Does it have a ## FINDINGS section with ALL five sub-areas: Lungs and Pleura, Heart and Mediastinum, Bones and Soft Tissues, Hardware/Lines/Tubes, Localization?
-3. Does the Localization line describe a SPECIFIC anatomical region (e.g. "cardiac silhouette", "left lower zone") — NOT just a generic placeholder like "the region of the image"?
+3. Does the Localization line describe a SPECIFIC anatomical region (e.g. "cardiac silhouette", "left lower zone")?
 4. Does it have a ## IMPRESSION section with at least one bullet point?
 5. Does it have a ## RAG CLINICAL RECOMMENDATIONS section with at least one actionable step?
 6. If the disease is "Effusion", does it mention TB or NTEP screening?
 7. Does it correctly identify **{state['disease']}** as the primary finding?
-8. Does it mention ONLY **{state['disease']}** by name — NOT any other disease from this list: {[d for d in state['all_probs'].keys() if d != state['disease']]}? (Single-disease focus check.)
+8. Does it mention ONLY **{state['disease']}** by name — NOT any other disease from: {[d for d in state['all_probs'].keys() if d != state['disease']]}?
 
 Reply in EXACTLY this format and nothing else:
 
@@ -335,9 +357,8 @@ FEEDBACK:
 Draft:
 {state['draft']}
 """
-    response = llm.invoke(prompt).content.strip()
+    response = _get_llm().invoke(prompt).content.strip()
 
-    # Robust verdict extraction
     verdict_match = re.search(r"VERDICT:\s*(PASS|FAIL)", response, re.IGNORECASE)
     verdict = verdict_match.group(1).upper() if verdict_match else "FAIL"
 
@@ -350,24 +371,14 @@ Draft:
         return {**state, "feedback": feedback}
 
 
-# ── Conditional edge ───────────────────────────────────────────────────────────
+# ---- Conditional edge --------------------------------------------------------
 def route_after_auditor(state: ReportState) -> str:
     if not state["feedback"] or state["iterations"] >= 3:
         return END
     return "scribe"
 
 
-# ── Graph ──────────────────────────────────────────────────────────────────────
-graph = StateGraph(ReportState)
-graph.add_node("scribe",  scribe)
-graph.add_node("auditor", auditor)
-graph.set_entry_point("scribe")
-graph.add_edge("scribe", "auditor")
-graph.add_conditional_edges("auditor", route_after_auditor)
-report_graph = graph.compile()
-
-
-# ── Public function ────────────────────────────────────────────────────────────
+# ---- Public function ----------------------------------------------------------
 def generate_report(
     disease: str,
     probability: float,
@@ -376,7 +387,7 @@ def generate_report(
     original_base64: str,
     heatmap_base64: str,
 ) -> dict:
-    result = report_graph.invoke({
+    result = _get_graph().invoke({
         "disease":         disease,
         "probability":     probability,
         "positive":        positive,

@@ -1,3 +1,12 @@
+"""
+main.py — Dr. Chakshu API
+
+Heavy imports (torch, langchain, etc.) are intentionally deferred into the
+endpoint functions via local imports. This lets uvicorn bind to $PORT in
+< 0.5 s at startup, satisfying Render's port scanner before any library is
+even loaded.
+"""
+
 import threading
 from contextlib import asynccontextmanager
 import asyncio
@@ -5,39 +14,53 @@ import asyncio
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
-from model import load_model
-from inference import run_full_pipeline
-from report_graph import generate_report
-from chat_router import router as chat_router
-from config import DEVICE, DISEASES
+from config import DISEASES   # config.py: only os + pathlib — no torch
 
+# ---- Lazy model singleton ------------------------------------------------
 _model_lock = threading.Lock()
 _model = None
+
 
 def get_model():
     global _model
     if _model is None:
         with _model_lock:
             if _model is None:
+                from model import load_model   # deferred — pulls torch
                 _model = load_model()
     return _model
 
+
+# ---- App -----------------------------------------------------------------
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # App starts up instantly so Render/cloud platforms bind to port immediately
+    # Nothing blocks here — uvicorn binds to $PORT instantly.
+    # Heavy imports (torch, langchain) happen on first request.
     yield
     global _model
     _model = None
 
+
 app = FastAPI(title="Dr. Chakshu API", version="2.0.0", lifespan=lifespan)
 
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Chat router is registered at startup (before any request), but its
+# internal heavy imports (langchain, groq) are deferred inside chat_agent.py
+from chat_router import router as chat_router
 app.include_router(chat_router)
 
 
+# ---- Endpoints -----------------------------------------------------------
 @app.get("/health")
 def health():
-    return {"status": "ok", "device": str(DEVICE), "diseases": DISEASES}
+    from config import get_device
+    return {"status": "ok", "device": str(get_device()), "diseases": DISEASES}
 
 
 @app.post("/predict")
@@ -48,15 +71,16 @@ async def predict(file: UploadFile = File(...)):
 
     raw_bytes = await file.read()
 
-    # Step 1 — ML inference + Grad-CAM
+    # Step 1 — ML inference + Grad-CAM (lazy imports torch on first call)
     try:
-        model_instance = get_model()
-        visual = run_full_pipeline(model_instance, raw_bytes)
+        from inference import run_full_pipeline
+        visual = run_full_pipeline(get_model(), raw_bytes)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Inference failed: {e}")
 
-    # Step 2 — LangGraph: Scribe → Auditor → structured report
+    # Step 2 — LangGraph: Scribe -> Auditor -> structured report
     try:
+        from report_graph import generate_report
         report = await asyncio.to_thread(
             generate_report,
             visual["disease"],

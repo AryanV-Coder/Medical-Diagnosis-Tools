@@ -14,20 +14,20 @@ from tools import all_tools
 
 load_dotenv()
 
-# ── LLM ───────────────────────────────────────────────────────────────────────
-# Using Qwen 3 32B on Groq — it has reliable native tool calling support,
-# unlike llama-3.3-70b-versatile which generates broken tool call formats.
-llm = ChatGroq(
-    model="qwen/qwen3.8-27b",
-    api_key=os.getenv("GROQ_API_KEY"),
-    temperature=0.2,
-)
+# ---- Lazy singleton — nothing runs at import time ----------------------------
+_chat_agent = None
 
+def _get_chat_agent():
+    global _chat_agent
+    if _chat_agent is None:
+        llm = ChatGroq(
+            model="qwen/qwen3.8-27b",
+            api_key=os.getenv("GROQ_API_KEY"),
+            temperature=0.2,
+        )
+        _chat_agent = create_react_agent(llm, all_tools)
+    return _chat_agent
 
-# ── Agent Setup ────────────────────────────────────────────────────────────────
-# We use the prebuilt ReAct agent. It natively handles the Thought -> Action -> Observation loop.
-# We will inject the system prompt dynamically per run so we can include the report context.
-chat_agent = create_react_agent(llm, all_tools)
 
 
 def _format_intermediate_steps(messages: list) -> list[dict]:
@@ -126,7 +126,7 @@ You answer questions about chest radiograph interpretation, including:
 
     # 3. Invoke the agent
     # The agent will loop internally until it returns a final AIMessage without tool calls.
-    result_state = chat_agent.invoke({"messages": messages})
+    result_state = _get_chat_agent().invoke({"messages": messages})
     
     # 4. Extract results
     all_output_messages = result_state["messages"]

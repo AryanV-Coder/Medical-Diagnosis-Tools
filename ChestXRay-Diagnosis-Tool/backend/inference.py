@@ -12,7 +12,7 @@ from pytorch_grad_cam import GradCAM
 from pytorch_grad_cam.utils.image import show_cam_on_image
 from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
 
-from config import IMAGE_SIZE, DEVICE, THRESHOLD, DISEASES
+from config import IMAGE_SIZE, get_device, THRESHOLD, DISEASES
 
 
 # Same transforms used during training
@@ -32,7 +32,7 @@ def load_image(raw_bytes: bytes):
     rgb = np.array(pil.resize((IMAGE_SIZE, IMAGE_SIZE)), dtype=np.float32) / 255.0
 
     # Normalised tensor for the model
-    tensor = preprocess(pil).unsqueeze(0).to(DEVICE)
+    tensor = preprocess(pil).unsqueeze(0).to(get_device())
 
     return tensor, rgb
 

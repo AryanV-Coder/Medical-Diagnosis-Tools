@@ -10,8 +10,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 import asyncio
 
-from chat_agent import run_chat
-
+# run_chat is imported lazily inside the chat endpoint to avoid slow module-level imports
 router = APIRouter(prefix="/chat", tags=["Chat"])
 
 # ── In-memory session store ────────────────────────────────────────────────────
@@ -69,6 +68,7 @@ async def chat(req: ChatRequest):
 
     # Run the agentic graph in a thread (it's synchronous LangGraph)
     try:
+        from chat_agent import run_chat
         result = await asyncio.to_thread(
             run_chat,
             session_id,
