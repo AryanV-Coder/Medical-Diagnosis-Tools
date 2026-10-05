@@ -3,7 +3,7 @@
  * POST /predict — multipart/form-data with a single "file" field.
  */
 
-const BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
+const BASE_URL = import.meta.env.BACKEND_API_URL ?? "http://localhost:8000";
 
 /**
  * @param {File} imageFile
